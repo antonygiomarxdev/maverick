@@ -1,0 +1,17 @@
+[package]
+name = "maverick-crypto"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+aes = "0.8"
+cmac = "0.7"
+ctr = "0.9"
+cipher = "0.4"
+thiserror = "1"
+
+[dev-dependencies]
+maverick-domain = { workspace = true }

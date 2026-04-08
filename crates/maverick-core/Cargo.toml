@@ -1,0 +1,35 @@
+[package]
+name = "maverick-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "maverick_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "maverick-server"
+path = "src/bin/main.rs"
+
+[dependencies]
+async-trait.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+libsql.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+maverick-domain.workspace = true
+maverick-crypto.workspace = true
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+hyper = "1"

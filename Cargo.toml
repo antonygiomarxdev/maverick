@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = ["crates/maverick-core", "crates/maverick-domain", "crates/maverick-crypto"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Antony <antony@example.com>"]
+license = "MIT"
+repository = "https://github.com/example/maverick-core"
+
+[workspace.dependencies]
+maverick-domain = { path = "crates/maverick-domain", version = "0.1.0" }
+maverick-crypto = { path = "crates/maverick-crypto", version = "0.1.0" }
+async-trait = "0.1"
+axum = { version = "0.7", features = ["macros", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+libsql = { version = "0.9" }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+anyhow = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
