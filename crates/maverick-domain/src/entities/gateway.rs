@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::types::Eui64;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GatewayStatus {
@@ -17,7 +17,11 @@ pub struct GeoLocation {
 
 impl GeoLocation {
     pub fn new(latitude: f64, longitude: f64, altitude: Option<f64>) -> Self {
-        Self { latitude, longitude, altitude }
+        Self {
+            latitude,
+            longitude,
+            altitude,
+        }
     }
 }
 

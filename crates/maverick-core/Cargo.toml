@@ -27,9 +27,13 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
+base64.workspace = true
+sysinfo.workspace = true
 maverick-domain.workspace = true
 maverick-crypto.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
 hyper = "1"
+cmac = "0.7"
+aes = "0.8"

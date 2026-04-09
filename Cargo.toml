@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/maverick-core", "crates/maverick-domain", "crates/maverick-crypto"]
+members = [
+    "crates/maverick-core",
+    "crates/maverick-domain",
+    "crates/maverick-crypto",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -24,6 +28,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
 anyhow = "1"
+base64 = "0.22"
+sysinfo = "0.30"
 
 [profile.release]
 lto = true

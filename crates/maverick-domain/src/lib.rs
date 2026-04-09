@@ -1,5 +1,5 @@
-pub mod types;
 pub mod entities;
+pub mod types;
 
-pub use types::*;
 pub use entities::*;
+pub use types::*;

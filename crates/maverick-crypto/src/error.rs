@@ -24,7 +24,10 @@ pub enum CryptoError {
     AesOperation { context: String },
 
     #[error("MIC mismatch: expected {expected:?}, computed {computed:?}")]
-    MicMismatch { expected: [u8; 4], computed: [u8; 4] },
+    MicMismatch {
+        expected: [u8; 4],
+        computed: [u8; 4],
+    },
 
     #[error("Invalid DevAddr in frame: {value:#010X}")]
     InvalidDevAddr { value: u32 },
@@ -59,11 +62,15 @@ impl CryptoError {
     }
 
     pub fn cmac_failure(context: impl Into<String>) -> Self {
-        Self::CmacComputation { context: context.into() }
+        Self::CmacComputation {
+            context: context.into(),
+        }
     }
 
     pub fn aes_failure(context: impl Into<String>) -> Self {
-        Self::AesOperation { context: context.into() }
+        Self::AesOperation {
+            context: context.into(),
+        }
     }
 }
 

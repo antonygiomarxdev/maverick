@@ -2,8 +2,8 @@ use aes::Aes128;
 use cmac::Mac;
 type CmacEngine = cmac::Cmac<Aes128>;
 
-use cipher::{KeyInit, KeyIvInit, StreamCipher};
 use crate::error::{CryptoError, Result};
+use cipher::{KeyInit, KeyIvInit, StreamCipher};
 
 const AES_KEY_SIZE: usize = 16;
 
@@ -32,14 +32,11 @@ impl AesCtr {
                 available: output.len(),
             });
         }
-        
+
         output[..input.len()].copy_from_slice(input);
-        
-        let mut cipher = ctr::Ctr128BE::<Aes128>::new(
-            &self.key.into(),
-            iv.into(),
-        );
-        
+
+        let mut cipher = ctr::Ctr128BE::<Aes128>::new(&self.key.into(), iv.into());
+
         cipher.apply_keystream(&mut output[..input.len()]);
         Ok(())
     }

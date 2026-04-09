@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::types::{Eui64, Frequency, SpreadingFactor};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Downlink {

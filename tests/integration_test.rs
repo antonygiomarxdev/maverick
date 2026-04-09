@@ -1,11 +1,11 @@
-use maverick_core::{api::{create_app, AppState}, db::DbPool};
+use maverick_core::{api::{create_app, AppState}, config::RuntimeConfig, db::SqliteDb};
 use axum::{body::Body, http::Request};
 use tower::ServiceExt;
 
 #[tokio::test]
 async fn health_endpoint_returns_ok() {
-    let db = DbPool::in_memory().expect("Failed to create in-memory database");
-    let state = AppState::new(db, "0.1.0-test");
+    let db = SqliteDb::in_memory().await.expect("Failed to create in-memory database");
+    let state = AppState::from_parts(db, RuntimeConfig::default(), "0.1.0-test");
     let app = create_app(state);
 
     let response = app

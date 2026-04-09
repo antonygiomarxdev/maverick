@@ -1,5 +1,5 @@
+use crate::types::{AppKey, DevNonce, Eui64, FrameCounter, NwkKey};
 use serde::{Deserialize, Serialize};
-use crate::types::{Eui64, AppKey, NwkKey, DevNonce, FrameCounter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeviceClass {

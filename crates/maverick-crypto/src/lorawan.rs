@@ -20,7 +20,11 @@ impl LoRawanFrameHeader {
         let dev_addr = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         let f_ctrl = bytes[4];
         let fcnt = u16::from_le_bytes([bytes[5], bytes[6]]).into();
-        Ok(Self { dev_addr, f_ctrl, fcnt })
+        Ok(Self {
+            dev_addr,
+            f_ctrl,
+            fcnt,
+        })
     }
 
     pub fn has_opts(&self) -> bool {
@@ -220,6 +224,122 @@ impl PayloadDecryptor {
         iv[15] = 0x00;
 
         aes_ctr.decrypt_slice(&iv, ciphertext)
+    }
+}
+
+pub struct JoinCrypto;
+
+impl JoinCrypto {
+    /// Validates the MIC of a JoinRequest per LoRaWAN 1.0.3 §6.2.3.
+    /// MIC = AES128_CMAC(AppKey, MHDR|AppEUI|DevEUI|DevNonce)
+    pub fn validate_join_request_mic(app_key: &[u8; 16], raw_payload: &[u8]) -> Result<bool> {
+        if raw_payload.len() < MIC_SIZE {
+            return Ok(false);
+        }
+        let message = &raw_payload[..raw_payload.len() - MIC_SIZE];
+        let given_mic: [u8; 4] = raw_payload[raw_payload.len() - MIC_SIZE..]
+            .try_into()
+            .map_err(|_| CryptoError::InternalError("mic slice conversion failed"))?;
+        let cmac = Cmac::new(app_key)?;
+        let computed = cmac.compute(message)?;
+        let mut diff = 0u8;
+        for i in 0..MIC_SIZE {
+            diff |= computed[i] ^ given_mic[i];
+        }
+        Ok(diff == 0)
+    }
+
+    /// Validates the MIC of a data uplink per LoRaWAN 1.0.3 §4.4.
+    /// `mac_payload` = full frame bytes EXCEPT the last 4 MIC bytes.
+    /// MIC = AES128_CMAC(NwkSKey, B0 | mac_payload)[0..4]
+    pub fn validate_uplink_mic(
+        nwk_s_key: &[u8; 16],
+        dev_addr: u32,
+        fcnt: u32,
+        mac_payload: &[u8],
+        mic: &[u8; 4],
+    ) -> Result<bool> {
+        let msg_len = mac_payload.len() as u8;
+        let dev_addr_bytes = dev_addr.to_le_bytes();
+        let fcnt_bytes = fcnt.to_le_bytes();
+        // B0 block: 0x49 | Pad4 | Dir(0=uplink) | DevAddr(4 LE) | FCntUp(4 LE) | 0x00 | Len
+        let b0 = [
+            0x49,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00, // direction: 0 = uplink
+            dev_addr_bytes[0],
+            dev_addr_bytes[1],
+            dev_addr_bytes[2],
+            dev_addr_bytes[3],
+            fcnt_bytes[0],
+            fcnt_bytes[1],
+            fcnt_bytes[2],
+            fcnt_bytes[3],
+            0x00,
+            msg_len,
+        ];
+        let mut message = b0.to_vec();
+        message.extend_from_slice(mac_payload);
+        let cmac = Cmac::new(nwk_s_key)?;
+        let computed = cmac.compute(&message)?;
+        let mut diff = 0u8;
+        for i in 0..MIC_SIZE {
+            diff |= computed[i] ^ mic[i];
+        }
+        Ok(diff == 0)
+    }
+
+    /// Derives NwkSKey and AppSKey per LoRaWAN 1.0.3 §6.2.5.
+    /// Returns (NwkSKey, AppSKey).
+    pub fn derive_session_keys(
+        app_key: &[u8; 16],
+        app_nonce: [u8; 3],
+        net_id: [u8; 3],
+        dev_nonce: u16,
+    ) -> Result<([u8; 16], [u8; 16])> {
+        let dev_nonce_bytes = dev_nonce.to_le_bytes();
+        let mut nwk_pad = [0u8; 16];
+        nwk_pad[0] = 0x01;
+        nwk_pad[1..4].copy_from_slice(&app_nonce);
+        nwk_pad[4..7].copy_from_slice(&net_id);
+        nwk_pad[7..9].copy_from_slice(&dev_nonce_bytes);
+        let mut app_pad = [0u8; 16];
+        app_pad[0] = 0x02;
+        app_pad[1..4].copy_from_slice(&app_nonce);
+        app_pad[4..7].copy_from_slice(&net_id);
+        app_pad[7..9].copy_from_slice(&dev_nonce_bytes);
+        let nwk_s_key = Self::aes128_encrypt_block(app_key, &nwk_pad)?;
+        let app_s_key = Self::aes128_encrypt_block(app_key, &app_pad)?;
+        Ok((nwk_s_key, app_s_key))
+    }
+
+    /// Derives a deterministic DevAddr from AppKey and DevEUI for private networks.
+    pub fn derive_dev_addr(app_key: &[u8; 16], dev_eui: &[u8; 8]) -> Result<u32> {
+        let cmac = Cmac::new(app_key)?;
+        let mut input = [0u8; 16];
+        input[0..8].copy_from_slice(dev_eui);
+        let computed = cmac.compute(&input)?;
+        Ok(u32::from_le_bytes([
+            computed[0],
+            computed[1],
+            computed[2],
+            computed[3],
+        ]))
+    }
+
+    fn aes128_encrypt_block(key: &[u8; 16], plaintext: &[u8; 16]) -> Result<[u8; 16]> {
+        use aes::cipher::generic_array::GenericArray;
+        use aes::cipher::{BlockEncrypt, KeyInit};
+        let cipher = aes::Aes128::new_from_slice(key)
+            .map_err(|_| CryptoError::invalid_key_length(16, key.len()))?;
+        let mut block = GenericArray::clone_from_slice(plaintext);
+        cipher.encrypt_block(&mut block);
+        let mut out = [0u8; 16];
+        out.copy_from_slice(&block);
+        Ok(out)
     }
 }
 

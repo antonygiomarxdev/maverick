@@ -1,32 +1,107 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use maverick_core::{api::{create_app, AppState}, db::{SqliteDb, Database}};
+use maverick_core::{
+    adapters::persistence::{
+        CircularUplinkBuffer, SqliteAuditLogWriter, SqliteDownlinkRepository,
+        SqliteUplinkRepository,
+    },
+    api::{create_app, AppState},
+    config::RuntimeConfig,
+    db::{select_database, BatchWriter},
+    events::EventBus,
+    ingester::run_udp_ingester,
+    kernel::KernelServices,
+    ports::UplinkRepository,
+    storage_profile::StorageProfile,
+    use_cases::{DeliveryConfig, DownlinkDeliveryService, NoopDownlinkSender, RetentionService},
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let config = RuntimeConfig::from_env()?;
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "maverick_core=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| config.log_filter.clone().into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let db = SqliteDb::in_memory()?;
-    db.execute_batch(
-        "CREATE TABLE IF NOT EXISTS health_check (id INTEGER PRIMARY KEY);",
-    )
-    .await?;
+    let (db, resolved_storage_profile) = select_database(&config).await?;
 
-    let state = AppState::new(db, env!("CARGO_PKG_VERSION"));
+    tracing::info!(
+        storage_profile = %resolved_storage_profile,
+        max_local_storage_mb = config.storage_limits.max_local_storage_mb,
+        retention_days = config.storage_limits.retention_days,
+        "storage profile resolved"
+    );
+
+    let event_bus = EventBus::new(config.event_bus_capacity);
+    let db_arc = Arc::new(db);
+
+    let uplink_repo: Arc<dyn UplinkRepository + Send + Sync> = match resolved_storage_profile {
+        StorageProfile::Extreme => Arc::new(CircularUplinkBuffer::new(
+            config.storage_limits.circular_buffer_capacity,
+            event_bus.clone(),
+        )),
+        _ => {
+            let sqlite_repo = Arc::new(SqliteUplinkRepository::new(db_arc.clone()));
+            let batch = BatchWriter::new(sqlite_repo, config.storage_limits.batch_commit_size);
+            let interval =
+                Duration::from_millis(config.storage_limits.batch_commit_interval_ms as u64);
+            batch.clone().spawn_drain_loop(interval);
+            Arc::new(batch)
+        }
+    };
+
+    let services = KernelServices::new(
+        db_arc,
+        config.clone(),
+        env!("CARGO_PKG_VERSION"),
+        event_bus,
+        uplink_repo,
+    );
+    let state = AppState::new(services);
+
+    if resolved_storage_profile != StorageProfile::Extreme {
+        let retention = RetentionService::new(
+            state.services.db.clone(),
+            config.storage_limits.clone(),
+            state.services.event_bus.clone(),
+        );
+        tokio::spawn(async move { retention.run_forever().await });
+    }
+
+    let downlink_delivery = DownlinkDeliveryService::new(
+        SqliteDownlinkRepository::new(state.services.db.clone()),
+        SqliteAuditLogWriter::new(state.services.db.clone()),
+        state.services.event_bus.clone(),
+        Arc::new(NoopDownlinkSender),
+        DeliveryConfig::default(),
+    );
+    downlink_delivery.spawn_delivery_loop(Duration::from_secs(1));
+
+    let udp_handle = run_udp_ingester(state.services.clone(), config.udp_max_datagram_size);
     let app = create_app(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr: SocketAddr = config.http_bind_addr.parse().map_err(|err| {
+        anyhow::anyhow!("invalid http bind addr '{}': {err}", config.http_bind_addr)
+    })?;
     tracing::info!("🚀 Server starting on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    tokio::select! {
+        result = axum::serve(listener, app) => {
+            result?;
+        }
+        result = udp_handle => {
+            result.map_err(|err| anyhow::anyhow!("udp ingester task join error: {err}"))??;
+        }
+    }
 
     Ok(())
 }

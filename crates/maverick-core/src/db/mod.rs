@@ -1,11 +1,15 @@
-pub mod sqlite;
+pub mod backend_selector;
+pub mod batch_writer;
 pub mod database;
+pub mod sqlite;
 
+pub use backend_selector::select_database;
+pub use batch_writer::BatchWriter;
 pub use database::{Database, QueryResult, Row, Value};
 pub use sqlite::SqliteDb;
 
-use std::sync::Arc;
 use crate::error::Result;
+use std::sync::Arc;
 
 pub struct DatabasePool<D: Database> {
     db: Arc<D>,
@@ -23,7 +27,9 @@ impl<D: Database> DatabasePool<D> {
 
 impl<D: Database> Clone for DatabasePool<D> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone() }
+        Self {
+            db: self.db.clone(),
+        }
     }
 }
 
