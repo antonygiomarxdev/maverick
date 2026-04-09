@@ -1,0 +1,18 @@
+edition = "2021"
+
+# Line width
+max_width = 100
+
+# Force LF on all platforms
+newline_style = "Unix"
+
+# Imports
+reorder_imports = true
+reorder_modules = true
+
+# Indentation
+tab_spaces = 4
+
+# Convenience shorthands
+use_field_init_shorthand = true
+use_try_shorthand = true

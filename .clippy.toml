@@ -1,0 +1,14 @@
+# Maximum cognitive complexity per function
+cognitive-complexity-threshold = 25
+
+# Allow up to 7 lines in closures before Clippy warns
+too-many-lines-threshold = 100
+
+# Minimum chars for string-to-enum suggestions
+enum-variant-name-threshold = 3
+
+# Disallow types above this stack size threshold (bytes)
+trivial-copy-size-limit = 128
+
+# Large error types (bytes) — keeps Result<T, E> cheap
+large-error-threshold = 256

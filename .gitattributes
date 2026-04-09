@@ -1,0 +1,27 @@
+# Normalize line endings to LF on all platforms
+* text=auto eol=lf
+
+# Rust sources — always LF
+*.rs text eol=lf
+
+# Config / data files — always LF
+*.toml text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.sql  text eol=lf
+
+# Shell scripts — LF (required for execution)
+*.sh text eol=lf
+
+# Windows batch — CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files — no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.wasm binary
