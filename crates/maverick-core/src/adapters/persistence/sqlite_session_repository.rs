@@ -10,6 +10,7 @@ use crate::db::{Database, Row};
 use crate::error::Result;
 use crate::ports::SessionRepository;
 
+#[derive(Clone)]
 pub struct SqliteSessionRepository<D: Database> {
     db: Arc<D>,
 }

@@ -22,9 +22,10 @@ Maverick focuses on operational resilience and clean boundaries:
 Current implemented capabilities:
 
 - HTTP management API for device lifecycle
-- downlink enqueue and status retrieval API
+- gateway listing and healthy gateway discovery API
+- downlink enqueue, listing and status retrieval API
 - Semtech UDP ingest path for radio observations
-- local persistence with SQLite/libSQL schema bootstrap
+- local persistence with SQLite schema bootstrap
 - storage profile selection based on runtime constraints
 - retention and buffering strategies for constrained hardware
 - structured audit/event pipeline across API and UDP flows
@@ -73,11 +74,32 @@ curl -X POST http://localhost:8080/api/v1/devices/0102030405060708/downlinks \
 	}'
 ```
 
+Enqueue a downlink with automatic gateway selection:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/devices/0102030405060708/downlinks \
+	-H "Content-Type: application/json" \
+	-d '{
+		"payload": "AQI=",
+		"f_port": 10,
+		"frequency_hz": 868100000,
+		"spreading_factor": 7,
+		"frame_counter": 2,
+		"priority": "High"
+	}'
+```
+
 ## API Surface (Current)
 
 Health:
 
 - GET /api/v1/health
+
+Gateways:
+
+- GET /api/v1/gateways
+- GET /api/v1/gateways?status=Online|Offline|Timeout
+- GET /api/v1/gateways/healthy
 
 Devices:
 
@@ -89,11 +111,13 @@ Devices:
 Downlinks:
 
 - POST /api/v1/devices/:dev_eui/downlinks
+- GET /api/v1/devices/:dev_eui/downlinks
 - GET /api/v1/devices/:dev_eui/downlinks/:downlink_id
 
 Boundary encoding rules:
 
 - DevEUI and AppEUI as hex strings
+- GatewayEUI as hex string when explicitly provided
 - AppKey and NwkKey as base64 strings
 - domain validation mapped to classified HTTP responses
 

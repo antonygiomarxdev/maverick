@@ -11,6 +11,7 @@ use crate::db::{Database, Row};
 use crate::error::{AppError, DomainError, Result};
 use crate::ports::GatewayRepository;
 
+#[derive(Clone)]
 pub struct SqliteGatewayRepository<D: Database> {
     db: Arc<D>,
 }
@@ -99,6 +100,26 @@ impl<D: Database> GatewayRepository for SqliteGatewayRepository<D> {
         );
         let rows = self.db.query(&query).await?;
         rows.into_iter().next().map(gateway_from_row).transpose()
+    }
+
+    async fn list(&self, status: Option<GatewayStatus>) -> Result<Vec<Gateway>> {
+        let filter = status
+            .map(|value| {
+                format!(
+                    " WHERE status = {}",
+                    optional_text_literal(Some(gateway_status_name(value)))
+                )
+            })
+            .unwrap_or_default();
+        let query = format!(
+            "SELECT gateway_eui, status, latitude, longitude, altitude, tx_frequency, rx_temperature, tx_temperature, platform, bridge_ip, last_seen FROM gateways{filter} ORDER BY CASE status WHEN 'Online' THEN 0 WHEN 'Timeout' THEN 1 ELSE 2 END, COALESCE(last_seen, 0) DESC"
+        );
+        let rows = self.db.query(&query).await?;
+        rows.into_iter().map(gateway_from_row).collect()
+    }
+
+    async fn list_healthy(&self) -> Result<Vec<Gateway>> {
+        self.list(Some(GatewayStatus::Online)).await
     }
 }
 

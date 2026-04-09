@@ -4,6 +4,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod events;
+pub mod host;
 pub mod ingester;
 pub mod kernel;
 pub mod ports;

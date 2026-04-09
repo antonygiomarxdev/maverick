@@ -7,3 +7,13 @@ use crate::events::AuditRecord;
 pub trait AuditLogWriter: Send + Sync {
     async fn record(&self, record: AuditRecord) -> Result<()>;
 }
+
+#[async_trait]
+impl<T> AuditLogWriter for &T
+where
+    T: AuditLogWriter + Sync,
+{
+    async fn record(&self, record: AuditRecord) -> Result<()> {
+        (**self).record(record).await
+    }
+}

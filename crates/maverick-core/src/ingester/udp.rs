@@ -2,14 +2,11 @@ use std::sync::Arc;
 
 use tokio::net::UdpSocket;
 
-use crate::adapters::persistence::{
-    SqliteAuditLogWriter, SqliteDeviceRepository, SqliteGatewayRepository, SqliteSessionRepository,
-};
 use crate::db::Database;
 use crate::events::{AuditRecord, EventKind, EventSource, EventStatus, SystemEvent};
 use crate::kernel::KernelServices;
 use crate::ports::AuditLogWriter;
-use crate::use_cases::{IngestUplinkService, ProcessUplinkFrameCommand, ProcessUplinkFrameService};
+use crate::use_cases::ProcessUplinkFrameCommand;
 use crate::{AppError, Result};
 
 use super::semtech::parse_push_data;
@@ -46,22 +43,10 @@ impl<D: Database + Clone + Send + Sync + 'static> UdpIngester<D> {
     }
 
     async fn handle_datagram(&self, datagram: Vec<u8>) -> Result<()> {
-        let audit_log = SqliteAuditLogWriter::new(self.services.db.clone());
-
         match parse_push_data(&datagram) {
             Ok(parsed) => {
-                let service = IngestUplinkService::new(
-                    Arc::clone(&self.services.uplink_repo),
-                    SqliteGatewayRepository::new(self.services.db.clone()),
-                    audit_log,
-                    self.services.event_bus.clone(),
-                );
-                let frame_service = ProcessUplinkFrameService::new(
-                    SqliteSessionRepository::new(self.services.db.clone()),
-                    SqliteAuditLogWriter::new(self.services.db.clone()),
-                    self.services.event_bus.clone(),
-                    SqliteDeviceRepository::new(self.services.db.clone()),
-                );
+                let service = self.services.ingest_uplink_service();
+                let frame_service = self.services.process_uplink_frame_service();
 
                 for command in parsed.commands {
                     let frame_cmd = ProcessUplinkFrameCommand {
@@ -89,7 +74,7 @@ impl<D: Database + Clone + Send + Sync + 'static> UdpIngester<D> {
                     &summary,
                 )
                 .with_metadata("payload_size", datagram.len().to_string());
-                audit_log.record(audit).await?;
+                self.services.audit_log.record(audit).await?;
 
                 self.services.event_bus.publish(
                     SystemEvent::new(

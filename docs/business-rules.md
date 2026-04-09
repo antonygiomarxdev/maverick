@@ -9,13 +9,19 @@ Este documento describe las reglas de negocio implementadas en Maverick que aseg
 - **Implementación**: `gateway_eui` es PRIMARY KEY en tabla `gateways`
 - **Comportamiento**: 
   - INSERT duplicado → SQLite rechaza con constraint violation
-  - UPSERT duplicado → actualiza el gateway existente
-- **Operación por defecto**: `upsert()` permite actualizar gateways existentes
+   - UPDATE sobre gateway inexistente → dominio responde `NotFound`
+- **Operaciones vigentes**: `create()` crea, `update()` modifica, `delete()` elimina y `list()`/`list_healthy()` exponen superficie operativa
 
 ### Regla: Gateway Status Validation
 - **Valores válidos**: `Online`, `Offline`, `Timeout`
 - **Implementación**: Enum `GatewayStatus` en dominio
 - **Comportamiento**: Compilación falla si se usa estado inválido
+
+### Regla: Automatic Gateway Selection for Downlinks
+- **Descripción**: Si un downlink no especifica `gateway_eui`, Maverick debe seleccionar un gateway saludable automáticamente
+- **Implementación**: `GatewaySelector` del kernel sobre `list_healthy()` del repositorio
+- **Criterio actual**: score determinista por estado saludable, recencia (`last_seen`) y disponibilidad de telemetría básica
+- **Comportamiento**: si no hay gateways saludables disponibles, el enqueue falla con conflicto de estado
 
 ## Device Management
 

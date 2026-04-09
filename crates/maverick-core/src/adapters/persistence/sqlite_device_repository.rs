@@ -10,6 +10,7 @@ use crate::db::{Database, Row};
 use crate::error::{AppError, DomainError, Result};
 use crate::ports::DeviceRepository;
 
+#[derive(Clone)]
 pub struct SqliteDeviceRepository<D: Database> {
     db: Arc<D>,
 }

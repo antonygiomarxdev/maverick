@@ -8,6 +8,7 @@ use crate::events::AuditRecord;
 use crate::ports::AuditLogWriter;
 use crate::Result;
 
+#[derive(Clone)]
 pub struct SqliteAuditLogWriter<D: Database> {
     db: Arc<D>,
 }

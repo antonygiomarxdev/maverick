@@ -11,9 +11,22 @@ It exists to prove that a full capability can be implemented without coupling HT
 - `PATCH /api/v1/devices/:dev_eui`
 - `DELETE /api/v1/devices/:dev_eui`
 
+## Gateway Endpoints
+
+- `GET /api/v1/gateways`
+- `GET /api/v1/gateways?status=Online|Offline|Timeout`
+- `GET /api/v1/gateways/healthy`
+
+## Downlink Endpoints
+
+- `POST /api/v1/devices/:dev_eui/downlinks`
+- `GET /api/v1/devices/:dev_eui/downlinks`
+- `GET /api/v1/devices/:dev_eui/downlinks/:downlink_id`
+
 ## Boundary Formats
 
 - `dev_eui`: hex string
+- `gateway_eui`: hex string when explicitly provided
 - `app_eui`: hex string
 - `app_key`: base64 string
 - `nwk_key`: base64 string
@@ -35,7 +48,15 @@ It exists to prove that a full capability can be implemented without coupling HT
 - invalid input -> `400`
 - duplicate device -> `409`
 - missing device -> `404`
+- downlink without explicit `gateway_eui` and without healthy gateways available -> `409`
 - infrastructure failure -> `500`
+
+## Downlink Routing Semantics
+
+- `gateway_eui` is optional on downlink enqueue
+- when omitted, Maverick selects the best healthy gateway using the kernel selector
+- healthy gateways are currently derived from repository state (`Online`) and ordered by score/recency
+- selected gateway is persisted with the queued downlink and visible in retrieval/list endpoints
 
 ## Kernel Guarantees for This Surface
 

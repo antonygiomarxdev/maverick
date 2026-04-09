@@ -41,12 +41,16 @@ pub struct OperationContext {
 }
 
 impl OperationContext {
-    pub fn api(correlation_id: Option<String>) -> Self {
+    pub fn new(source: EventSource, actor: impl Into<String>, correlation_id: Option<String>) -> Self {
         Self {
-            source: EventSource::Api,
-            actor: "anonymous".to_string(),
+            source,
+            actor: actor.into(),
             correlation_id,
         }
+    }
+
+    pub fn api(correlation_id: Option<String>) -> Self {
+        Self::new(EventSource::Api, "anonymous", correlation_id)
     }
 }
 

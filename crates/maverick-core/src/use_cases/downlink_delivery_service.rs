@@ -2,10 +2,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use maverick_domain::Downlink;
+use maverick_domain::{Downlink, Eui64};
 
 use crate::events::{AuditRecord, EventBus, EventKind, EventSource, EventStatus, SystemEvent};
-use crate::ports::{AuditLogWriter, DownlinkRepository, DownlinkState, QueuedDownlink};
+use crate::kernel::GatewaySelector;
+use crate::ports::{
+    AuditLogWriter, DownlinkRepository, DownlinkState, GatewayRepository, QueuedDownlink,
+};
 use crate::Result;
 
 #[async_trait]
@@ -41,22 +44,25 @@ impl DownlinkSender for NoopDownlinkSender {
     }
 }
 
-pub struct DownlinkDeliveryService<R, A, S> {
+pub struct DownlinkDeliveryService<R, G, A, S> {
     repository: R,
+    gateways: G,
     audit_log: A,
     event_bus: EventBus,
     sender: Arc<S>,
     config: DeliveryConfig,
 }
 
-impl<R, A, S> DownlinkDeliveryService<R, A, S>
+impl<R, G, A, S> DownlinkDeliveryService<R, G, A, S>
 where
     R: DownlinkRepository + 'static,
+    G: GatewayRepository + 'static,
     A: AuditLogWriter + 'static,
     S: DownlinkSender + 'static,
 {
     pub fn new(
         repository: R,
+        gateways: G,
         audit_log: A,
         event_bus: EventBus,
         sender: Arc<S>,
@@ -64,6 +70,7 @@ where
     ) -> Self {
         Self {
             repository,
+            gateways,
             audit_log,
             event_bus,
             sender,
@@ -165,9 +172,27 @@ where
         }
 
         let retry_at = now + self.config.retry_delay_secs;
-        self.repository
-            .mark_retry(item.id, retry_at, reason)
+        if let Some(alternate_gateway) = self.next_gateway_candidate(item.downlink.gateway_eui).await? {
+            self.repository
+                .mark_retry_with_gateway(item.id, retry_at, alternate_gateway, reason)
+                .await?;
+            self.record_event(
+                item.id,
+                "downlink.failover",
+                EventStatus::Rejected,
+                Some(item.downlink.dev_eui.to_string()),
+                Some(format!(
+                    "gateway {} -> {}: {reason}",
+                    item.downlink.gateway_eui,
+                    alternate_gateway
+                )),
+            )
             .await?;
+        } else {
+            self.repository
+                .mark_retry(item.id, retry_at, reason)
+                .await?;
+        }
         self.record_event(
             item.id,
             "downlink.retry",
@@ -177,6 +202,17 @@ where
         )
         .await?;
         Ok(())
+    }
+
+    async fn next_gateway_candidate(&self, current_gateway: Eui64) -> Result<Option<Eui64>> {
+        let selector = GatewaySelector::new(&self.gateways);
+        let candidate = selector
+            .healthy_candidates()
+            .await?
+            .into_iter()
+            .find(|candidate| candidate.gateway_eui != current_gateway)
+            .map(|candidate| candidate.gateway_eui);
+        Ok(candidate)
     }
 
     async fn record_event(
@@ -231,13 +267,15 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use maverick_domain::{Downlink, Eui64, Frequency, SpreadingFactor};
+    use maverick_domain::{Downlink, Eui64, Frequency, Gateway, GatewayStatus, SpreadingFactor};
 
     use super::{DeliveryConfig, DownlinkDeliveryService, DownlinkSender};
-    use crate::adapters::persistence::{SqliteAuditLogWriter, SqliteDownlinkRepository};
+    use crate::adapters::persistence::{
+        SqliteAuditLogWriter, SqliteDownlinkRepository, SqliteGatewayRepository,
+    };
     use crate::db::SqliteDb;
     use crate::events::EventBus;
-    use crate::ports::{DownlinkRepository, DownlinkState};
+    use crate::ports::{DownlinkRepository, DownlinkState, GatewayRepository};
 
     struct FailingSender;
 
@@ -245,6 +283,21 @@ mod tests {
     impl DownlinkSender for FailingSender {
         async fn send(&self, _downlink: &Downlink) -> crate::Result<()> {
             Err(crate::AppError::Event("gateway send failed".to_string()))
+        }
+    }
+
+    struct FailFirstGatewaySender {
+        failing_gateway: Eui64,
+    }
+
+    #[async_trait]
+    impl DownlinkSender for FailFirstGatewaySender {
+        async fn send(&self, downlink: &Downlink) -> crate::Result<()> {
+            if downlink.gateway_eui == self.failing_gateway {
+                Err(crate::AppError::Event("gateway send failed".to_string()))
+            } else {
+                Ok(())
+            }
         }
     }
 
@@ -267,6 +320,7 @@ mod tests {
     async fn worker_marks_scheduled_and_sent_with_success_sender() {
         let db = Arc::new(SqliteDb::in_memory().await.expect("db must open"));
         let repository = SqliteDownlinkRepository::new(db.clone());
+        let gateways = SqliteGatewayRepository::new(db.clone());
         let audit = SqliteAuditLogWriter::new(db);
         let event_bus = EventBus::new(16);
 
@@ -277,6 +331,7 @@ mod tests {
 
         let service = DownlinkDeliveryService::new(
             repository,
+            gateways,
             audit,
             event_bus,
             Arc::new(super::NoopDownlinkSender),
@@ -302,6 +357,7 @@ mod tests {
     async fn worker_retries_and_then_marks_failed() {
         let db = Arc::new(SqliteDb::in_memory().await.expect("db must open"));
         let repository = SqliteDownlinkRepository::new(db.clone());
+        let gateways = SqliteGatewayRepository::new(db.clone());
         let audit = SqliteAuditLogWriter::new(db);
         let event_bus = EventBus::new(16);
 
@@ -312,6 +368,7 @@ mod tests {
 
         let service = DownlinkDeliveryService::new(
             repository,
+            gateways,
             audit,
             event_bus,
             Arc::new(FailingSender),
@@ -345,5 +402,74 @@ mod tests {
             .expect("downlink must exist");
         assert_eq!(current.state, DownlinkState::Failed);
         assert!(current.attempt_count >= 2);
+    }
+
+    #[tokio::test]
+    async fn worker_failover_switches_gateway_before_next_retry() {
+        let db = Arc::new(SqliteDb::in_memory().await.expect("db must open"));
+        let repository = SqliteDownlinkRepository::new(db.clone());
+        let gateways = SqliteGatewayRepository::new(db.clone());
+        let audit = SqliteAuditLogWriter::new(db.clone());
+        let event_bus = EventBus::new(16);
+
+        let first_gateway = Eui64::from([8, 7, 6, 5, 4, 3, 2, 1]);
+        let second_gateway = Eui64::from([9, 7, 6, 5, 4, 3, 2, 1]);
+
+        let mut primary = Gateway::new(first_gateway);
+        primary.status = GatewayStatus::Online;
+        primary.last_seen = Some(super::unix_timestamp());
+        primary.tx_frequency = Some(868_100_000);
+        gateways.create(primary).await.expect("primary must persist");
+
+        let mut alternate = Gateway::new(second_gateway);
+        alternate.status = GatewayStatus::Online;
+        alternate.last_seen = Some(super::unix_timestamp() - 1);
+        alternate.tx_frequency = Some(868_100_000);
+        gateways.create(alternate).await.expect("alternate must persist");
+
+        let id = repository
+            .enqueue(sample_downlink())
+            .await
+            .expect("enqueue must succeed");
+
+        let service = DownlinkDeliveryService::new(
+            repository,
+            gateways,
+            audit,
+            event_bus,
+            Arc::new(FailFirstGatewaySender {
+                failing_gateway: first_gateway,
+            }),
+            DeliveryConfig {
+                schedule_delay_secs: 0,
+                retry_delay_secs: 0,
+                max_attempts: 3,
+                ..DeliveryConfig::default()
+            },
+        );
+
+        service.process_once().await.expect("schedule must work");
+        service.process_once().await.expect("first send fail must work");
+
+        let retried = service
+            .repository
+            .get_by_id(id)
+            .await
+            .expect("query must succeed")
+            .expect("downlink must exist");
+        assert_eq!(retried.state, DownlinkState::Queued);
+        assert_eq!(retried.downlink.gateway_eui, second_gateway);
+
+        service.process_once().await.expect("reschedule must work");
+        service.process_once().await.expect("second send must succeed");
+
+        let current = service
+            .repository
+            .get_by_id(id)
+            .await
+            .expect("query must succeed")
+            .expect("downlink must exist");
+        assert_eq!(current.state, DownlinkState::Sent);
+        assert_eq!(current.downlink.gateway_eui, second_gateway);
     }
 }

@@ -3,12 +3,12 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 use maverick_domain::{
-    AppKey, Device, DeviceClass, DeviceState, Downlink, DownlinkPriority, Eui64, Frequency, NwkKey,
-    SpreadingFactor,
+    AppKey, Device, DeviceClass, DeviceState, Downlink, DownlinkPriority, Eui64, Frequency,
+    Gateway, GatewayStatus, NwkKey, SpreadingFactor,
 };
 
 use crate::ports::{DownlinkState, QueuedDownlink};
-use crate::use_cases::{CreateDeviceCommand, UpdateDeviceCommand};
+use crate::use_cases::{CreateDeviceCommand, DownlinkDraft, UpdateDeviceCommand};
 use crate::{DomainError, Result};
 
 #[derive(Debug, Deserialize)]
@@ -113,9 +113,76 @@ impl From<Device> for DeviceResponseDto {
     }
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct GatewayListQueryDto {
+    pub status: Option<String>,
+}
+
+impl GatewayListQueryDto {
+    pub fn status_filter(&self) -> Result<Option<GatewayStatus>> {
+        self.status.as_deref().map(parse_gateway_status_str).transpose()
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct DownlinkListQueryDto {
+    pub state: Option<String>,
+    pub limit: Option<usize>,
+}
+
+impl DownlinkListQueryDto {
+    pub fn state_filter(&self) -> Result<Option<DownlinkState>> {
+        self.state.as_deref().map(parse_downlink_state_str).transpose()
+    }
+
+    pub fn limit_or_default(&self) -> usize {
+        self.limit.unwrap_or(50).clamp(1, 200)
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct GatewayLocationResponseDto {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub altitude: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GatewayResponseDto {
+    pub gateway_eui: String,
+    pub status: String,
+    pub location: Option<GatewayLocationResponseDto>,
+    pub tx_frequency: Option<u32>,
+    pub rx_temperature: Option<f32>,
+    pub tx_temperature: Option<f32>,
+    pub platform: Option<String>,
+    pub bridge_ip: Option<String>,
+    pub last_seen: Option<i64>,
+}
+
+impl From<Gateway> for GatewayResponseDto {
+    fn from(gateway: Gateway) -> Self {
+        Self {
+            gateway_eui: encode_hex(&gateway.gateway_eui.as_bytes()),
+            status: gateway_status_name(gateway.status).to_string(),
+            location: gateway.location.map(|location| GatewayLocationResponseDto {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                altitude: location.altitude,
+            }),
+            tx_frequency: gateway.tx_frequency,
+            rx_temperature: gateway.rx_temperature,
+            tx_temperature: gateway.tx_temperature,
+            platform: gateway.platform,
+            bridge_ip: gateway.bridge_ip,
+            last_seen: gateway.last_seen,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateDownlinkRequestDto {
-    pub gateway_eui: String,
+    pub gateway_eui: Option<String>,
     pub payload: String,
     pub f_port: u8,
     pub frequency_hz: u32,
@@ -126,7 +193,7 @@ pub struct CreateDownlinkRequestDto {
 }
 
 impl CreateDownlinkRequestDto {
-    pub fn into_domain(self, dev_eui: Eui64) -> Result<Downlink> {
+    pub fn into_draft(self, dev_eui: Eui64) -> Result<DownlinkDraft> {
         if self.f_port > 223 {
             return Err(DomainError::Validation {
                 field: "f_port",
@@ -136,7 +203,43 @@ impl CreateDownlinkRequestDto {
         }
 
         let payload = decode_base64_bytes("payload", &self.payload, 255)?;
-        let gateway_eui = parse_eui64("gateway_eui", &self.gateway_eui)?;
+        let spreading_factor =
+            SpreadingFactor::new(self.spreading_factor).ok_or_else(|| DomainError::Validation {
+                field: "spreading_factor",
+                reason: "spreading_factor must be between 7 and 12".to_string(),
+            })?;
+
+        Ok(DownlinkDraft {
+            payload,
+            f_port: self.f_port,
+            dev_eui,
+            frequency: Frequency::new(self.frequency_hz),
+            spreading_factor,
+            timestamp: unix_timestamp(),
+            frame_counter: self.frame_counter,
+            priority: parse_downlink_priority(self.priority.as_deref())?,
+            scheduled_at: self.scheduled_at,
+        })
+    }
+
+    pub fn into_domain(self, dev_eui: Eui64) -> Result<Downlink> {
+        let gateway_eui = self.gateway_eui.clone().ok_or_else(|| DomainError::Validation {
+            field: "gateway_eui",
+            reason: "gateway_eui is required when no automatic selector is applied".to_string(),
+        })?;
+        self.into_domain_with_gateway(dev_eui, parse_eui64("gateway_eui", &gateway_eui)?)
+    }
+
+    pub fn into_domain_with_gateway(self, dev_eui: Eui64, gateway_eui: Eui64) -> Result<Downlink> {
+        if self.f_port > 223 {
+            return Err(DomainError::Validation {
+                field: "f_port",
+                reason: "f_port must be between 0 and 223".to_string(),
+            }
+            .into());
+        }
+
+        let payload = decode_base64_bytes("payload", &self.payload, 255)?;
         let spreading_factor =
             SpreadingFactor::new(self.spreading_factor).ok_or_else(|| DomainError::Validation {
                 field: "spreading_factor",
@@ -262,6 +365,19 @@ fn parse_device_state_str(value: &str) -> Result<DeviceState> {
     }
 }
 
+fn parse_gateway_status_str(value: &str) -> Result<GatewayStatus> {
+    match value {
+        "Online" => Ok(GatewayStatus::Online),
+        "Offline" => Ok(GatewayStatus::Offline),
+        "Timeout" => Ok(GatewayStatus::Timeout),
+        _ => Err(DomainError::Validation {
+            field: "status",
+            reason: "unsupported status, expected Online|Offline|Timeout".to_string(),
+        }
+        .into()),
+    }
+}
+
 fn parse_downlink_priority(value: Option<&str>) -> Result<DownlinkPriority> {
     match value.unwrap_or("Normal") {
         "Low" => Ok(DownlinkPriority::Low),
@@ -271,6 +387,20 @@ fn parse_downlink_priority(value: Option<&str>) -> Result<DownlinkPriority> {
         _ => Err(DomainError::Validation {
             field: "priority",
             reason: "unsupported priority, expected Low|Normal|High|Critical".to_string(),
+        }
+        .into()),
+    }
+}
+
+fn parse_downlink_state_str(value: &str) -> Result<DownlinkState> {
+    match value {
+        "Queued" => Ok(DownlinkState::Queued),
+        "Scheduled" => Ok(DownlinkState::Scheduled),
+        "Sent" => Ok(DownlinkState::Sent),
+        "Failed" => Ok(DownlinkState::Failed),
+        _ => Err(DomainError::Validation {
+            field: "state",
+            reason: "unsupported state, expected Queued|Scheduled|Sent|Failed".to_string(),
         }
         .into()),
     }
@@ -355,6 +485,14 @@ fn downlink_priority_name(value: DownlinkPriority) -> &'static str {
         DownlinkPriority::Normal => "Normal",
         DownlinkPriority::High => "High",
         DownlinkPriority::Critical => "Critical",
+    }
+}
+
+fn gateway_status_name(value: GatewayStatus) -> &'static str {
+    match value {
+        GatewayStatus::Online => "Online",
+        GatewayStatus::Offline => "Offline",
+        GatewayStatus::Timeout => "Timeout",
     }
 }
 

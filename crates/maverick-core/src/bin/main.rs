@@ -4,19 +4,14 @@ use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use maverick_core::{
-    adapters::persistence::{
-        CircularUplinkBuffer, SqliteAuditLogWriter, SqliteDownlinkRepository,
-        SqliteUplinkRepository,
-    },
-    api::{create_app, AppState},
+    adapters::persistence::{CircularUplinkBuffer, SqliteUplinkRepository},
+    api::create_app,
     config::RuntimeConfig,
     db::{select_database, BatchWriter},
     events::EventBus,
-    ingester::run_udp_ingester,
-    kernel::KernelServices,
+    host::{build_app_state, spawn_runtime_tasks},
     ports::UplinkRepository,
     storage_profile::StorageProfile,
-    use_cases::{DeliveryConfig, DownlinkDeliveryService, NoopDownlinkSender, RetentionService},
 };
 
 #[tokio::main]
@@ -57,34 +52,14 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let services = KernelServices::new(
+    let state = build_app_state(
         db_arc,
         config.clone(),
         env!("CARGO_PKG_VERSION"),
         event_bus,
         uplink_repo,
     );
-    let state = AppState::new(services);
-
-    if resolved_storage_profile != StorageProfile::Extreme {
-        let retention = RetentionService::new(
-            state.services.db.clone(),
-            config.storage_limits.clone(),
-            state.services.event_bus.clone(),
-        );
-        tokio::spawn(async move { retention.run_forever().await });
-    }
-
-    let downlink_delivery = DownlinkDeliveryService::new(
-        SqliteDownlinkRepository::new(state.services.db.clone()),
-        SqliteAuditLogWriter::new(state.services.db.clone()),
-        state.services.event_bus.clone(),
-        Arc::new(NoopDownlinkSender),
-        DeliveryConfig::default(),
-    );
-    downlink_delivery.spawn_delivery_loop(Duration::from_secs(1));
-
-    let udp_handle = run_udp_ingester(state.services.clone(), config.udp_max_datagram_size);
+    let udp_handle = spawn_runtime_tasks(&state, resolved_storage_profile);
     let app = create_app(state);
 
     let addr: SocketAddr = config.http_bind_addr.parse().map_err(|err| {

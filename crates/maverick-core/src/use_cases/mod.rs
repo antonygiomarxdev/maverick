@@ -14,7 +14,7 @@ pub use downlink_delivery_service::{
 };
 pub use ingest_uplink::{IngestUplinkCommand, IngestUplinkService};
 pub use process_downlink_frame::{
-    EnqueueDownlinkCommand, EnqueueDownlinkOutcome, ProcessDownlinkFrameService,
+    DownlinkDraft, EnqueueDownlinkCommand, EnqueueDownlinkOutcome, ProcessDownlinkFrameService,
 };
 pub use process_uplink_frame::{
     ProcessUplinkFrameCommand, ProcessUplinkFrameOutcome, ProcessUplinkFrameService,

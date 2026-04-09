@@ -1,14 +1,12 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::{Json, Router};
 
 use super::AppState;
-use crate::adapters::persistence::{
-    SqliteAuditLogWriter, SqliteDeviceRepository, SqliteDownlinkRepository,
-};
 use crate::api::dto::{
     parse_path_dev_eui, CreateDeviceRequestDto, CreateDownlinkRequestDto, DeviceResponseDto,
-    DownlinkEnqueueResponseDto, DownlinkResponseDto, PatchDeviceRequestDto,
+    DownlinkEnqueueResponseDto, DownlinkListQueryDto, DownlinkResponseDto, GatewayListQueryDto,
+    GatewayResponseDto, PatchDeviceRequestDto,
 };
 use crate::db::Database;
 use crate::use_cases::{
@@ -20,10 +18,15 @@ use crate::DomainError;
 fn router<D: Database + Clone + Send + Sync + 'static>() -> Router<AppState<D>> {
     Router::new()
         .route("/health", axum::routing::get(health_check))
+        .route("/gateways", axum::routing::get(list_gateways::<D>))
+        .route(
+            "/gateways/healthy",
+            axum::routing::get(list_healthy_gateways::<D>),
+        )
         .route("/devices", axum::routing::post(create_device::<D>))
         .route(
             "/devices/:dev_eui/downlinks",
-            axum::routing::post(enqueue_downlink::<D>),
+            axum::routing::get(list_downlinks::<D>).post(enqueue_downlink::<D>),
         )
         .route(
             "/devices/:dev_eui/downlinks/:downlink_id",
@@ -63,6 +66,32 @@ async fn health_check<D: Database + Clone + Send + Sync + 'static>(
     };
 
     (StatusCode::OK, axum::Json(response))
+}
+
+async fn list_gateways<D: Database + Clone + Send + Sync + 'static>(
+    State(state): State<AppState<D>>,
+    Query(query): Query<GatewayListQueryDto>,
+) -> crate::Result<Json<Vec<GatewayResponseDto>>> {
+    let gateways =
+        crate::ports::GatewayRepository::list(&state.services.gateway_repo, query.status_filter()?)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
+    Ok(Json(gateways))
+}
+
+async fn list_healthy_gateways<D: Database + Clone + Send + Sync + 'static>(
+    State(state): State<AppState<D>>,
+) -> crate::Result<Json<Vec<GatewayResponseDto>>> {
+    let gateways = crate::ports::GatewayRepository::list_healthy(&state.services.gateway_repo)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
+    Ok(Json(gateways))
 }
 
 async fn create_device<D: Database + Clone + Send + Sync + 'static>(
@@ -138,10 +167,17 @@ async fn enqueue_downlink<D: Database + Clone + Send + Sync + 'static>(
     Json(payload): Json<CreateDownlinkRequestDto>,
 ) -> crate::Result<(StatusCode, Json<DownlinkEnqueueResponseDto>)> {
     let service = downlink_service(&state);
-    let downlink = payload.into_domain(parse_path_dev_eui(&dev_eui)?)?;
+    let dev_eui = parse_path_dev_eui(&dev_eui)?;
+    let gateway_override = payload
+        .gateway_eui
+        .as_deref()
+        .map(crate::api::dto::parse_path_dev_eui)
+        .transpose()?;
+    let draft = payload.into_draft(dev_eui)?;
     let outcome = service
         .enqueue(EnqueueDownlinkCommand {
-            downlink,
+            draft,
+            gateway_override,
             correlation_id: correlation_id(&headers),
         })
         .await?;
@@ -155,13 +191,32 @@ async fn enqueue_downlink<D: Database + Clone + Send + Sync + 'static>(
     ))
 }
 
+async fn list_downlinks<D: Database + Clone + Send + Sync + 'static>(
+    State(state): State<AppState<D>>,
+    Path(dev_eui): Path<String>,
+    Query(query): Query<DownlinkListQueryDto>,
+) -> crate::Result<Json<Vec<DownlinkResponseDto>>> {
+    let items = crate::ports::DownlinkRepository::list_by_dev_eui(
+        &state.services.downlink_repo,
+        parse_path_dev_eui(&dev_eui)?,
+        query.state_filter()?,
+        query.limit_or_default(),
+    )
+    .await?
+    .into_iter()
+    .map(Into::into)
+    .collect();
+
+    Ok(Json(items))
+}
+
 async fn get_downlink<D: Database + Clone + Send + Sync + 'static>(
     State(state): State<AppState<D>>,
     Path((dev_eui, downlink_id)): Path<(String, i64)>,
 ) -> crate::Result<Json<DownlinkResponseDto>> {
-    let repository = SqliteDownlinkRepository::new(state.services.db.clone());
     let Some(downlink) =
-        crate::ports::DownlinkRepository::get_by_id(&repository, downlink_id).await?
+        crate::ports::DownlinkRepository::get_by_id(&state.services.downlink_repo, downlink_id)
+            .await?
     else {
         return Err(DomainError::NotFound {
             entity: "downlink",
@@ -184,22 +239,21 @@ async fn get_downlink<D: Database + Clone + Send + Sync + 'static>(
 
 fn device_service<D: Database + Clone + Send + Sync + 'static>(
     state: &AppState<D>,
-) -> DeviceManagementService<SqliteDeviceRepository<D>, SqliteAuditLogWriter<D>> {
-    DeviceManagementService::new(
-        SqliteDeviceRepository::new(state.services.db.clone()),
-        SqliteAuditLogWriter::new(state.services.db.clone()),
-        state.services.event_bus.clone(),
-    )
+) -> DeviceManagementService<
+    &crate::adapters::persistence::SqliteDeviceRepository<D>,
+    &crate::adapters::persistence::SqliteAuditLogWriter<D>,
+> {
+    state.services.device_service()
 }
 
 fn downlink_service<D: Database + Clone + Send + Sync + 'static>(
     state: &AppState<D>,
-) -> ProcessDownlinkFrameService<SqliteDownlinkRepository<D>, SqliteAuditLogWriter<D>> {
-    ProcessDownlinkFrameService::new(
-        SqliteDownlinkRepository::new(state.services.db.clone()),
-        SqliteAuditLogWriter::new(state.services.db.clone()),
-        state.services.event_bus.clone(),
-    )
+) -> ProcessDownlinkFrameService<
+    &crate::adapters::persistence::SqliteDownlinkRepository<D>,
+    &crate::adapters::persistence::SqliteGatewayRepository<D>,
+    &crate::adapters::persistence::SqliteAuditLogWriter<D>,
+> {
+    state.services.downlink_service()
 }
 
 fn correlation_id(headers: &HeaderMap) -> Option<String> {

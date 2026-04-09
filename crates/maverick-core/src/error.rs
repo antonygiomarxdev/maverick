@@ -77,11 +77,14 @@ impl axum::response::IntoResponse for AppError {
             ),
         };
 
-        axum::Json(serde_json::json!({
-            "error": message,
-            "status": status.as_u16()
-        }))
-        .into_response()
+        (
+            status,
+            axum::Json(serde_json::json!({
+                "error": message,
+                "status": status.as_u16()
+            })),
+        )
+            .into_response()
     }
 }
 

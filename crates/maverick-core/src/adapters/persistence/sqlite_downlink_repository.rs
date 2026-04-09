@@ -11,6 +11,7 @@ use crate::db::{Database, Row};
 use crate::error::{AppError, Result};
 use crate::ports::{DownlinkRepository, DownlinkState, QueuedDownlink};
 
+#[derive(Clone)]
 pub struct SqliteDownlinkRepository<D: Database> {
     db: Arc<D>,
 }
@@ -53,6 +54,24 @@ impl<D: Database> DownlinkRepository for SqliteDownlinkRepository<D> {
         rows.into_iter().next().map(map_downlink_row).transpose()
     }
 
+    async fn list_by_dev_eui(
+        &self,
+        dev_eui: Eui64,
+        state: Option<DownlinkState>,
+        limit: usize,
+    ) -> Result<Vec<QueuedDownlink>> {
+        let state_filter = state
+            .map(|value| format!(" AND state = {}", optional_text_literal(Some(downlink_state_name(value)))))
+            .unwrap_or_default();
+        let query = format!(
+            "SELECT id, dev_eui, gateway_eui, payload, f_port, frequency_hz, spreading_factor, frame_counter, priority, scheduled_at, state, attempt_count, last_error, sent_at, created_at, updated_at FROM downlinks WHERE dev_eui = {}{state_filter} ORDER BY created_at DESC LIMIT {}",
+            blob_literal(dev_eui.as_bytes_slice()),
+            limit
+        );
+        let rows = self.db.query(&query).await?;
+        rows.into_iter().map(map_downlink_row).collect()
+    }
+
     async fn list_pending(&self, limit: usize) -> Result<Vec<QueuedDownlink>> {
         let query = format!(
             "SELECT id, dev_eui, gateway_eui, payload, f_port, frequency_hz, spreading_factor, frame_counter, priority, scheduled_at, state, attempt_count, last_error, sent_at, created_at, updated_at FROM downlinks WHERE state IN ('Queued', 'Scheduled') ORDER BY CASE priority WHEN 'Critical' THEN 3 WHEN 'High' THEN 2 WHEN 'Normal' THEN 1 ELSE 0 END DESC, created_at ASC LIMIT {}",
@@ -83,6 +102,24 @@ impl<D: Database> DownlinkRepository for SqliteDownlinkRepository<D> {
     async fn mark_retry(&self, id: i64, retry_at: i64, reason: &str) -> Result<()> {
         let query = format!(
             "UPDATE downlinks SET state = 'Queued', attempt_count = attempt_count + 1, last_error = {}, scheduled_at = {}, updated_at = unixepoch() WHERE id = {}",
+            optional_text_literal(Some(reason)),
+            retry_at,
+            id
+        );
+        self.db.execute(&query).await?;
+        Ok(())
+    }
+
+    async fn mark_retry_with_gateway(
+        &self,
+        id: i64,
+        retry_at: i64,
+        gateway_eui: Eui64,
+        reason: &str,
+    ) -> Result<()> {
+        let query = format!(
+            "UPDATE downlinks SET gateway_eui = {}, state = 'Queued', attempt_count = attempt_count + 1, last_error = {}, scheduled_at = {}, updated_at = unixepoch() WHERE id = {}",
+            blob_literal(gateway_eui.as_bytes_slice()),
             optional_text_literal(Some(reason)),
             retry_at,
             id
@@ -191,6 +228,15 @@ fn parse_state(value: &str) -> Result<DownlinkState> {
             "invalid downlink state '{}'",
             value
         ))),
+    }
+}
+
+fn downlink_state_name(value: DownlinkState) -> &'static str {
+    match value {
+        DownlinkState::Queued => "Queued",
+        DownlinkState::Scheduled => "Scheduled",
+        DownlinkState::Sent => "Sent",
+        DownlinkState::Failed => "Failed",
     }
 }
 
