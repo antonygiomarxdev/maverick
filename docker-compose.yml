@@ -1,0 +1,32 @@
+services:
+  maverick:
+    image: ${MAVERICK_IMAGE:-ghcr.io/antonygiomarxdev/maverick:latest}
+    # build: .   # uncomment to build locally instead
+    container_name: ${MAVERICK_CONTAINER_NAME:-maverick}
+    restart: ${MAVERICK_RESTART_POLICY:-unless-stopped}
+
+    ports:
+      - "${MAVERICK_HTTP_PORT:-8080}:8080" # HTTP management API
+      - "${MAVERICK_UDP_PORT:-1700}:1700/udp" # Semtech UDP packet forwarder
+
+    volumes:
+      - maverick-data:/var/lib/maverick
+
+    environment:
+      MAVERICK_HTTP_BIND_ADDR: "0.0.0.0:8080"
+      MAVERICK_UDP_BIND_ADDR: "0.0.0.0:1700"
+      MAVERICK_DB_PATH: "${MAVERICK_DB_PATH:-/var/lib/maverick/maverick.db}"
+      MAVERICK_LOG_FILTER: "${MAVERICK_LOG_FILTER:-maverick_core=info}"
+      MAVERICK_STORAGE_PROFILE: "${MAVERICK_STORAGE_PROFILE:-auto}"
+      MAVERICK_EVENT_BUS_CAPACITY: "${MAVERICK_EVENT_BUS_CAPACITY:-256}"
+      MAVERICK_UDP_MAX_DATAGRAM_SIZE: "${MAVERICK_UDP_MAX_DATAGRAM_SIZE:-4096}"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  maverick-data:
