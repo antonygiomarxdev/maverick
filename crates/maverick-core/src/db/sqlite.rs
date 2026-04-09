@@ -1,15 +1,16 @@
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::db::Database;
 use crate::error::{AppError, Result};
 use crate::storage_profile::StorageProfile;
 use async_trait::async_trait;
+use rusqlite::types::Value as RusqliteValue;
 
 const CORE_SCHEMA: &str = include_str!("schema.sql");
 
 pub struct SqliteDb {
-    conn: Arc<libsql::Connection>,
+    conn: Arc<Mutex<rusqlite::Connection>>,
 }
 
 impl SqliteDb {
@@ -33,22 +34,26 @@ impl SqliteDb {
     }
 
     async fn open_with_profile<P: AsRef<Path>>(path: P, profile: StorageProfile) -> Result<Self> {
-        let db = libsql::Builder::new_local(path)
-            .build()
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        let conn = db
-            .connect()
-            .map_err(|e| AppError::Database(e.to_string()))?;
+        let path = path.as_ref().to_string_lossy().into_owned();
+        let conn = tokio::task::spawn_blocking(move || -> Result<rusqlite::Connection> {
+            let conn = if path == ":memory:" {
+                rusqlite::Connection::open_in_memory()
+            } else {
+                rusqlite::Connection::open(&path)
+            };
+            conn.map_err(|e| AppError::Database(e.to_string()))
+        })
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))??;
 
-        let sqlite = Self {
-            conn: Arc::new(conn),
+        let db = Self {
+            conn: Arc::new(Mutex::new(conn)),
         };
 
-        sqlite.execute_batch(profile_pragmas(profile)).await?;
-        sqlite.execute_batch(CORE_SCHEMA).await?;
+        db.execute_batch(profile_pragmas(profile)).await?;
+        db.execute_batch(CORE_SCHEMA).await?;
 
-        Ok(sqlite)
+        Ok(db)
     }
 }
 
@@ -85,44 +90,59 @@ fn profile_pragmas(profile: StorageProfile) -> &'static str {
 #[async_trait]
 impl Database for SqliteDb {
     async fn execute(&self, query: &str) -> Result<crate::db::QueryResult> {
-        let affected_rows = self
-            .conn
-            .execute(query, ())
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-
-        Ok(crate::db::QueryResult {
-            affected_rows,
-            last_insert_id: statement_sets_last_insert_id(query)
-                .then(|| self.conn.last_insert_rowid()),
+        let conn = Arc::clone(&self.conn);
+        let query = query.to_string();
+        tokio::task::spawn_blocking(move || {
+            let conn = conn.lock().unwrap();
+            let affected = conn.execute(&query, []).map_err(map_rusqlite_error)?;
+            let last_insert_id =
+                statement_sets_last_insert_id(&query).then(|| conn.last_insert_rowid());
+            Ok(crate::db::QueryResult {
+                affected_rows: affected as u64,
+                last_insert_id,
+            })
         })
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?
     }
 
     async fn execute_batch(&self, queries: &str) -> Result<()> {
-        self.conn
-            .execute_batch(queries)
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        Ok(())
+        let conn = Arc::clone(&self.conn);
+        let queries = queries.to_string();
+        tokio::task::spawn_blocking(move || {
+            let conn = conn.lock().unwrap();
+            conn.execute_batch(&queries)
+                .map_err(|e| AppError::Database(e.to_string()))
+        })
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?
     }
 
     async fn query(&self, query: &str) -> Result<Vec<crate::db::Row>> {
-        let mut rows = self
-            .conn
-            .query(query, ())
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        let mut result = Vec::new();
-
-        while let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?
-        {
-            result.push(convert_row(&row)?);
-        }
-
-        Ok(result)
+        let conn = Arc::clone(&self.conn);
+        let query = query.to_string();
+        tokio::task::spawn_blocking(move || {
+            let conn = conn.lock().unwrap();
+            let mut stmt = conn
+                .prepare(&query)
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            let col_count = stmt.column_count();
+            let rows = stmt
+                .query_map([], |row| {
+                    let mut values = Vec::with_capacity(col_count);
+                    for i in 0..col_count {
+                        let value: RusqliteValue = row.get(i)?;
+                        values.push(convert_value(value));
+                    }
+                    Ok(crate::db::Row { values })
+                })
+                .map_err(|e| AppError::Database(e.to_string()))?
+                .collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            Ok(rows)
+        })
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?
     }
 }
 
@@ -131,33 +151,31 @@ fn statement_sets_last_insert_id(query: &str) -> bool {
     normalized.starts_with("insert") || normalized.starts_with("replace")
 }
 
-fn convert_row(row: &libsql::Row) -> Result<crate::db::Row> {
-    let mut values = Vec::with_capacity(row.column_count() as usize);
-
-    for index in 0..row.column_count() {
-        let value = row
-            .get_value(index)
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        values.push(convert_value(value));
+fn map_rusqlite_error(e: rusqlite::Error) -> AppError {
+    match &e {
+        rusqlite::Error::SqliteFailure(err, _)
+            if err.code == rusqlite::ErrorCode::ConstraintViolation =>
+        {
+            AppError::ConstraintViolation(e.to_string())
+        }
+        _ => AppError::Database(e.to_string()),
     }
-
-    Ok(crate::db::Row { values })
 }
 
-fn convert_value(value: libsql::Value) -> crate::db::Value {
+fn convert_value(value: RusqliteValue) -> crate::db::Value {
     match value {
-        libsql::Value::Null => crate::db::Value::Null,
-        libsql::Value::Integer(value) => crate::db::Value::Integer(value),
-        libsql::Value::Real(value) => crate::db::Value::Real(value),
-        libsql::Value::Text(value) => crate::db::Value::Text(value),
-        libsql::Value::Blob(value) => crate::db::Value::Blob(value),
+        RusqliteValue::Null => crate::db::Value::Null,
+        RusqliteValue::Integer(i) => crate::db::Value::Integer(i),
+        RusqliteValue::Real(f) => crate::db::Value::Real(f),
+        RusqliteValue::Text(s) => crate::db::Value::Text(s),
+        RusqliteValue::Blob(b) => crate::db::Value::Blob(b),
     }
 }
 
 impl Clone for SqliteDb {
     fn clone(&self) -> Self {
         Self {
-            conn: self.conn.clone(),
+            conn: Arc::clone(&self.conn),
         }
     }
 }

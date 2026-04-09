@@ -1,4 +1,4 @@
-use std::sync::Arc;
+﻿use std::sync::Arc;
 
 use async_trait::async_trait;
 use maverick_domain::{Eui64, Gateway, GatewayStatus, GeoLocation};
@@ -8,7 +8,7 @@ use crate::adapters::persistence::sqlite_utils::{
     required_text,
 };
 use crate::db::{Database, Row};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, DomainError, Result};
 use crate::ports::GatewayRepository;
 
 pub struct SqliteGatewayRepository<D: Database> {
@@ -23,34 +23,73 @@ impl<D: Database> SqliteGatewayRepository<D> {
 
 #[async_trait]
 impl<D: Database> GatewayRepository for SqliteGatewayRepository<D> {
-    async fn upsert(&self, gateway: Gateway) -> Result<Gateway> {
-        let (latitude, longitude, altitude) = if let Some(location) = &gateway.location {
-            (
-                optional_real(Some(location.latitude)),
-                optional_real(Some(location.longitude)),
-                optional_real(location.altitude),
-            )
-        } else {
-            ("NULL".to_string(), "NULL".to_string(), "NULL".to_string())
-        };
-
+    async fn create(&self, gateway: Gateway) -> Result<Gateway> {
+        let eui_str = gateway.gateway_eui.to_string();
+        let (latitude, longitude, altitude) = location_parts(&gateway);
         let query = format!(
-            "INSERT INTO gateways (gateway_eui, status, latitude, longitude, altitude, tx_frequency, rx_temperature, tx_temperature, platform, bridge_ip, last_seen, created_at, updated_at) VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, unixepoch(), unixepoch()) ON CONFLICT(gateway_eui) DO UPDATE SET status=excluded.status, latitude=excluded.latitude, longitude=excluded.longitude, altitude=excluded.altitude, tx_frequency=excluded.tx_frequency, rx_temperature=excluded.rx_temperature, tx_temperature=excluded.tx_temperature, platform=excluded.platform, bridge_ip=excluded.bridge_ip, last_seen=excluded.last_seen, updated_at=unixepoch()",
+            "INSERT INTO gateways (gateway_eui, status, latitude, longitude, altitude, tx_frequency, rx_temperature, tx_temperature, platform, bridge_ip, last_seen, created_at, updated_at) VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, unixepoch(), unixepoch())",
             blob_literal(gateway.gateway_eui.as_bytes_slice()),
             optional_text_literal(Some(gateway_status_name(gateway.status))),
             latitude,
             longitude,
             altitude,
-            optional_i64(gateway.tx_frequency.map(|value| value as i64)),
-            optional_real(gateway.rx_temperature.map(|value| value as f64)),
-            optional_real(gateway.tx_temperature.map(|value| value as f64)),
+            optional_i64(gateway.tx_frequency.map(|v| v as i64)),
+            optional_real(gateway.rx_temperature.map(|v| v as f64)),
+            optional_real(gateway.tx_temperature.map(|v| v as f64)),
             optional_text_literal(gateway.platform.as_deref()),
             optional_text_literal(gateway.bridge_ip.as_deref()),
             optional_i64(gateway.last_seen),
         );
-
-        self.db.execute(&query).await?;
+        self.db.execute(&query).await.map_err(|e| match e {
+            AppError::ConstraintViolation(_) => AppError::Domain(DomainError::AlreadyExists {
+                entity: "gateway",
+                id: eui_str,
+            }),
+            other => other,
+        })?;
         Ok(gateway)
+    }
+
+    async fn update(&self, gateway: Gateway) -> Result<Gateway> {
+        let eui_str = gateway.gateway_eui.to_string();
+        let (latitude, longitude, altitude) = location_parts(&gateway);
+        let query = format!(
+            "UPDATE gateways SET status = {}, latitude = {}, longitude = {}, altitude = {}, tx_frequency = {}, rx_temperature = {}, tx_temperature = {}, platform = {}, bridge_ip = {}, last_seen = {}, updated_at = unixepoch() WHERE gateway_eui = {}",
+            optional_text_literal(Some(gateway_status_name(gateway.status))),
+            latitude,
+            longitude,
+            altitude,
+            optional_i64(gateway.tx_frequency.map(|v| v as i64)),
+            optional_real(gateway.rx_temperature.map(|v| v as f64)),
+            optional_real(gateway.tx_temperature.map(|v| v as f64)),
+            optional_text_literal(gateway.platform.as_deref()),
+            optional_text_literal(gateway.bridge_ip.as_deref()),
+            optional_i64(gateway.last_seen),
+            blob_literal(gateway.gateway_eui.as_bytes_slice()),
+        );
+        let result = self.db.execute(&query).await?;
+        if result.affected_rows == 0 {
+            return Err(AppError::Domain(DomainError::NotFound {
+                entity: "gateway",
+                id: eui_str,
+            }));
+        }
+        Ok(gateway)
+    }
+
+    async fn delete(&self, gateway_eui: Eui64) -> Result<()> {
+        let query = format!(
+            "DELETE FROM gateways WHERE gateway_eui = {}",
+            blob_literal(gateway_eui.as_bytes_slice())
+        );
+        let result = self.db.execute(&query).await?;
+        if result.affected_rows == 0 {
+            return Err(AppError::Domain(DomainError::NotFound {
+                entity: "gateway",
+                id: gateway_eui.to_string(),
+            }));
+        }
+        Ok(())
     }
 
     async fn get_by_gateway_eui(&self, gateway_eui: Eui64) -> Result<Option<Gateway>> {
@@ -60,6 +99,17 @@ impl<D: Database> GatewayRepository for SqliteGatewayRepository<D> {
         );
         let rows = self.db.query(&query).await?;
         rows.into_iter().next().map(gateway_from_row).transpose()
+    }
+}
+
+fn location_parts(gateway: &Gateway) -> (String, String, String) {
+    match &gateway.location {
+        Some(loc) => (
+            optional_real(Some(loc.latitude)),
+            optional_real(Some(loc.longitude)),
+            optional_real(loc.altitude),
+        ),
+        None => ("NULL".to_string(), "NULL".to_string(), "NULL".to_string()),
     }
 }
 

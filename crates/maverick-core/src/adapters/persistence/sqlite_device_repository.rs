@@ -1,4 +1,4 @@
-use std::sync::Arc;
+﻿use std::sync::Arc;
 
 use async_trait::async_trait;
 use maverick_domain::{AppKey, Device, DeviceClass, DeviceKeys, DeviceState, Eui64, NwkKey};
@@ -7,7 +7,7 @@ use crate::adapters::persistence::sqlite_utils::{
     blob_literal, required_blob, required_i64, required_text, text_literal,
 };
 use crate::db::{Database, Row};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, DomainError, Result};
 use crate::ports::DeviceRepository;
 
 pub struct SqliteDeviceRepository<D: Database> {
@@ -34,8 +34,14 @@ impl<D: Database> DeviceRepository for SqliteDeviceRepository<D> {
             device.f_cnt_up,
             device.f_cnt_down,
         );
-
-        self.db.execute(&query).await?;
+        let dev_eui_str = device.dev_eui.to_string();
+        self.db.execute(&query).await.map_err(|e| match e {
+            AppError::ConstraintViolation(_) => AppError::Domain(DomainError::AlreadyExists {
+                entity: "device",
+                id: dev_eui_str,
+            }),
+            other => other,
+        })?;
         Ok(device)
     }
 

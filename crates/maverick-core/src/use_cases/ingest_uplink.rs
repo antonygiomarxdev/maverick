@@ -40,16 +40,21 @@ where
     pub async fn ingest(&self, command: IngestUplinkCommand) -> Result<()> {
         let gateway_eui = command.uplink.gateway_eui.to_string();
 
-        let mut gateway = self
+        let existing = self
             .gateway_repository
             .get_by_gateway_eui(command.uplink.gateway_eui)
-            .await?
-            .unwrap_or_else(|| Gateway::new(command.uplink.gateway_eui));
+            .await?;
+        let is_new = existing.is_none();
+        let mut gateway = existing.unwrap_or_else(|| Gateway::new(command.uplink.gateway_eui));
         gateway.status = GatewayStatus::Online;
         gateway.last_seen = Some(command.uplink.timestamp);
         gateway.tx_frequency = Some(command.uplink.frequency.as_hz());
 
-        self.gateway_repository.upsert(gateway).await?;
+        if is_new {
+            self.gateway_repository.create(gateway).await?;
+        } else {
+            self.gateway_repository.update(gateway).await?;
+        }
         self.uplink_repository
             .append(command.uplink.clone())
             .await?;

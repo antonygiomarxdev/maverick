@@ -37,6 +37,9 @@ pub enum AppError {
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    #[error("Constraint violation: {0}")]
+    ConstraintViolation(String),
 }
 
 impl axum::response::IntoResponse for AppError {
@@ -68,6 +71,10 @@ impl axum::response::IntoResponse for AppError {
                 self.to_string(),
             ),
             AppError::Serialization(_) => (axum::http::StatusCode::BAD_REQUEST, self.to_string()),
+            AppError::ConstraintViolation(_) => (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                self.to_string(),
+            ),
         };
 
         axum::Json(serde_json::json!({

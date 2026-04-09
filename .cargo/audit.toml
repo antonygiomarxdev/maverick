@@ -1,7 +1,0 @@
-targets = []
-deny = ["unsound", "unmaintained", "end-of-life"]
-
-[advisories]
-# LibSQL 0.9 has transitive deps with known issues we can't resolve directly
-# RUSTSEC-2026-0049: rustls-webpki vulnerability (waiting for libsql update)
-ignore = ["RUSTSEC-2026-0049"]

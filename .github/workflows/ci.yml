@@ -55,4 +55,4 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Audit dependencies
-        run: cargo audit --config .cargo/audit.toml
+        run: cargo audit
