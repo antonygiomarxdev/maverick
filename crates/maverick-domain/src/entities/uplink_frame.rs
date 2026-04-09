@@ -29,6 +29,7 @@ pub struct UplinkFrameMetadata {
 }
 
 impl UplinkFrame {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         gateway_eui: Eui64,
         payload: Vec<u8>,

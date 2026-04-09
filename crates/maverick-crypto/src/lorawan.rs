@@ -122,7 +122,7 @@ fn pad_to_block_size(data: &[u8]) -> Vec<u8> {
     } else {
         let mut padded = data.to_vec();
         padded.push(0x80);
-        while padded.len() % BLOCK_SIZE != 0 {
+        while !padded.len().is_multiple_of(BLOCK_SIZE) {
             padded.push(0x00);
         }
         padded

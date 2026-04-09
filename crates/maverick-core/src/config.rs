@@ -177,8 +177,10 @@ mod tests {
 
     #[test]
     fn explicit_env_profile_is_used_if_hardware_supports_it() {
-        let mut config = RuntimeConfig::default();
-        config.storage_profile = StorageProfile::Mid;
+        let config = RuntimeConfig {
+            storage_profile: StorageProfile::Mid,
+            ..Default::default()
+        };
 
         let resolved = config.resolve_storage_profile_with_snapshot(Some(HardwareSnapshot {
             total_memory_mb: 1024,
@@ -189,8 +191,10 @@ mod tests {
 
     #[test]
     fn explicit_env_profile_is_downgraded_if_hardware_cannot_support_it() {
-        let mut config = RuntimeConfig::default();
-        config.storage_profile = StorageProfile::High;
+        let config = RuntimeConfig {
+            storage_profile: StorageProfile::High,
+            ..Default::default()
+        };
 
         let resolved = config.resolve_storage_profile_with_snapshot(Some(HardwareSnapshot {
             total_memory_mb: 64,

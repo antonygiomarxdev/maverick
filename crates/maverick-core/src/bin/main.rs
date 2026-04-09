@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
             let sqlite_repo = Arc::new(SqliteUplinkRepository::new(db_arc.clone()));
             let batch = BatchWriter::new(sqlite_repo, config.storage_limits.batch_commit_size);
             let interval =
-                Duration::from_millis(config.storage_limits.batch_commit_interval_ms as u64);
+                Duration::from_millis(config.storage_limits.batch_commit_interval_ms);
             batch.clone().spawn_drain_loop(interval);
             Arc::new(batch)
         }

@@ -318,6 +318,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn audit_record(
         &self,
         operation: &str,

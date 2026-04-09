@@ -27,6 +27,7 @@ pub struct UplinkMetadata {
 }
 
 impl Uplink {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         payload: Vec<u8>,
         f_port: u8,

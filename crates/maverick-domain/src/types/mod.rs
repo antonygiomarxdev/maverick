@@ -149,7 +149,7 @@ pub struct SpreadingFactor(pub u8);
 
 impl SpreadingFactor {
     pub fn new(sf: u8) -> Option<Self> {
-        if sf >= 7 && sf <= 12 {
+        if (7..=12).contains(&sf) {
             Some(Self(sf))
         } else {
             None
