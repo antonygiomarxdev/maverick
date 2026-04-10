@@ -78,10 +78,13 @@ error: host glibc ${glibc_version} is older than required ${REQUIRED_GLIBC} for 
 The installer can auto-install common tools (curl/tar/coreutils), but glibc is part of the base OS
 and cannot be safely upgraded in-place by this installer.
 
-Recommended paths:
-  1) Upgrade OS to a supported baseline (Raspberry Pi OS Lite Bookworm or Debian 12 minimal).
-  2) Build from source on this host if you must stay on the current distro.
-  3) Advanced only: re-run with --skip-runtime-check (install may still fail at runtime).
+This installer will NOT perform an OS upgrade or modify base runtime libraries automatically.
+The decision is always left to the operator.
+
+Choose one path:
+  1) Build from source on this host if you must stay on the current distro.
+  2) Advanced only: re-run with --skip-runtime-check (install may still fail at runtime).
+  3) If desired, plan an OS upgrade to a supported baseline (Raspberry Pi OS Lite Bookworm or Debian 12 minimal).
 EOF
     exit 1
   fi

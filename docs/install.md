@@ -157,7 +157,7 @@ Docker tag notes:
 - `curl: (22) ... 404` during `--version latest`: no published GitHub Release yet, or GitHub API rate limit (unauthenticated). Open the [releases page](https://github.com/antonygiomarxdev/maverick/releases); if empty, wait for the first release or build from source.
 - `curl: (22) ... 404` when downloading the `.tar.gz`: wrong or unpublished `VERSION`, or asset name mismatch for your architecture.
 - `missing required command: ...`: rerun without `--no-install-deps` so the installer can bootstrap the missing prerequisite, or install it manually with your distro package manager.
-- `host glibc ... is older than required ...`: your distro baseline is too old for published binaries. The installer cannot safely upgrade glibc in-place; upgrade OS baseline (Bookworm/Debian 12) or build from source.
+- `host glibc ... is older than required ...`: your distro baseline is too old for published binaries. The installer will not upgrade the OS or runtime libraries automatically. Choose explicitly: build from source, continue with `--skip-runtime-check` (advanced), or plan an OS upgrade to a supported baseline.
 - `installed maverick-edge failed the --help smoke check`: check the runtime output printed by the installer; common cause is glibc/loader mismatch on older distros. Tier 1 edge baseline is Raspberry Pi OS Lite Bookworm or Debian 12 minimal.
 - `command not found`: ensure `/usr/local/bin` is in `PATH`.
 - `sha256sum mismatch`: re-download both asset and checksum; do not install.
