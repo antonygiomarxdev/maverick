@@ -57,6 +57,7 @@ The installer uses standard Linux DX conventions:
 
 - detects common package managers (`apt-get`, `dnf`, `yum`, `apk`, `pacman`, `zypper`),
 - installs missing prerequisites when possible (`tar`, `coreutils`, `ca-certificates`, and similar base tools),
+- validates runtime compatibility (glibc baseline) before downloading/installing binaries,
 - validates installed binaries with a `--help` smoke check before exiting.
 
 `bash -s --` passes arguments to the script read from stdin. Use `sudo` only if you need elevation for the whole pipeline (for example `sudo` in front of `bash` when installing to `/usr/local/bin` as a non-root user).
@@ -73,6 +74,12 @@ Disable automatic prerequisite installation only if you want a stricter/manual e
 
 ```bash
 /tmp/install-maverick.sh --version v0.1.0 --install-dir /usr/local/bin --no-install-deps
+```
+
+Bypass runtime compatibility precheck only for advanced troubleshooting:
+
+```bash
+/tmp/install-maverick.sh --version v0.1.0 --install-dir /usr/local/bin --skip-runtime-check
 ```
 
 If `--version latest` fails with a `404` from `curl`, there is no `latest` release yet. Use **Manual install** with an explicit `VERSION="vX.Y.Z"` after the first release is published, or build from source (repository `README.md`).
@@ -150,6 +157,7 @@ Docker tag notes:
 - `curl: (22) ... 404` during `--version latest`: no published GitHub Release yet, or GitHub API rate limit (unauthenticated). Open the [releases page](https://github.com/antonygiomarxdev/maverick/releases); if empty, wait for the first release or build from source.
 - `curl: (22) ... 404` when downloading the `.tar.gz`: wrong or unpublished `VERSION`, or asset name mismatch for your architecture.
 - `missing required command: ...`: rerun without `--no-install-deps` so the installer can bootstrap the missing prerequisite, or install it manually with your distro package manager.
+- `host glibc ... is older than required ...`: your distro baseline is too old for published binaries. The installer cannot safely upgrade glibc in-place; upgrade OS baseline (Bookworm/Debian 12) or build from source.
 - `installed maverick-edge failed the --help smoke check`: check the runtime output printed by the installer; common cause is glibc/loader mismatch on older distros. Tier 1 edge baseline is Raspberry Pi OS Lite Bookworm or Debian 12 minimal.
 - `command not found`: ensure `/usr/local/bin` is in `PATH`.
 - `sha256sum mismatch`: re-download both asset and checksum; do not install.

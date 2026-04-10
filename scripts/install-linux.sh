@@ -7,6 +7,85 @@ INSTALL_DIR="/usr/local/bin"
 VERSION="latest"
 AUTO_INSTALL_DEPS=1
 PACKAGE_MANAGER=""
+SKIP_RUNTIME_CHECK=0
+REQUIRED_GLIBC="2.34"
+
+version_lt() {
+  local lhs="$1"
+  local rhs="$2"
+  local i
+  local lhs_parts=()
+  local rhs_parts=()
+
+  IFS='.' read -r -a lhs_parts <<< "${lhs}"
+  IFS='.' read -r -a rhs_parts <<< "${rhs}"
+
+  for ((i=0; i<${#lhs_parts[@]} || i<${#rhs_parts[@]}; i++)); do
+    local lhs_part="${lhs_parts[i]:-0}"
+    local rhs_part="${rhs_parts[i]:-0}"
+
+    if ((10#${lhs_part} < 10#${rhs_part})); then
+      return 0
+    fi
+    if ((10#${lhs_part} > 10#${rhs_part})); then
+      return 1
+    fi
+  done
+
+  return 1
+}
+
+detect_glibc_version() {
+  local output=""
+
+  if command -v getconf >/dev/null 2>&1; then
+    output="$(getconf GNU_LIBC_VERSION 2>/dev/null || true)"
+    if [[ -n "${output}" ]]; then
+      awk '{ print $2; exit }' <<< "${output}"
+      return 0
+    fi
+  fi
+
+  if command -v ldd >/dev/null 2>&1; then
+    output="$(ldd --version 2>/dev/null | head -n 1 || true)"
+    if [[ -n "${output}" ]]; then
+      grep -oE '[0-9]+\.[0-9]+' <<< "${output}" | head -n 1
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+ensure_runtime_compatibility() {
+  if [[ "${SKIP_RUNTIME_CHECK}" -eq 1 ]]; then
+    echo "Skipping runtime compatibility checks (--skip-runtime-check)."
+    return
+  fi
+
+  local glibc_version=""
+  glibc_version="$(detect_glibc_version || true)"
+
+  if [[ -z "${glibc_version}" ]]; then
+    echo "warning: could not detect glibc version; continuing install" >&2
+    return
+  fi
+
+  if version_lt "${glibc_version}" "${REQUIRED_GLIBC}"; then
+    cat >&2 <<EOF
+error: host glibc ${glibc_version} is older than required ${REQUIRED_GLIBC} for published binaries.
+
+The installer can auto-install common tools (curl/tar/coreutils), but glibc is part of the base OS
+and cannot be safely upgraded in-place by this installer.
+
+Recommended paths:
+  1) Upgrade OS to a supported baseline (Raspberry Pi OS Lite Bookworm or Debian 12 minimal).
+  2) Build from source on this host if you must stay on the current distro.
+  3) Advanced only: re-run with --skip-runtime-check (install may still fail at runtime).
+EOF
+    exit 1
+  fi
+}
 
 is_root() {
   [[ "${EUID:-$(id -u)}" -eq 0 ]]
@@ -169,7 +248,7 @@ usage() {
 install-linux.sh - install maverick-edge (and maverick-edge-tui if present) on Linux
 
 Usage:
-  $0 [--version <tag|latest>] [--install-dir <path>] [--no-install-deps]
+  $0 [--version <tag|latest>] [--install-dir <path>] [--no-install-deps] [--skip-runtime-check]
 
 One-liner (download and run in a single command; requires bash):
   curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
@@ -178,6 +257,7 @@ Examples:
   $0 --version latest
   $0 --version v0.1.0 --install-dir /usr/local/bin
   $0 --version v0.1.0 --no-install-deps
+  $0 --version v0.1.0 --skip-runtime-check
 EOF
 }
 
@@ -193,6 +273,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-install-deps)
       AUTO_INSTALL_DEPS=0
+      shift
+      ;;
+    --skip-runtime-check)
+      SKIP_RUNTIME_CHECK=1
       shift
       ;;
     -h|--help)
@@ -235,6 +319,8 @@ case "${ARCH_RAW}" in
     exit 1
     ;;
 esac
+
+  ensure_runtime_compatibility
 
 if [[ "${VERSION}" == "latest" ]]; then
   LATEST_JSON="$(mktemp)"
