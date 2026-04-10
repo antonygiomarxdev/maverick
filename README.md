@@ -1,194 +1,43 @@
 # Maverick
 
-Maverick is a local-first LoRaWAN Network Server kernel designed for two realities at once:
+Offline-first LoRaWAN **edge runtime** (v1 baseline): small core, strict boundaries, optional adapters, future cloud sync via contracts only.
 
-- low-resource gateways close to the field
-- high-capacity servers in central infrastructure
+## North star
 
-The core idea is simple: keep one stable kernel, then scale behavior with runtime profiles, not with divergent codebases.
+Keep LoRaWAN operations running locally when connectivity is poor or absent; preserve durable local truth; never couple the kernel to optional infrastructure.
 
-## Why Maverick
+## Docs (source of truth)
 
-Maverick focuses on operational resilience and clean boundaries:
+| Doc | Purpose |
+|-----|---------|
+| [ROADMAP.md](ROADMAP.md) | Now / Next / Later execution board |
+| [docs/00-product-intent.md](docs/00-product-intent.md) | Scope and non-negotiables |
+| [docs/01-execution-plan.md](docs/01-execution-plan.md) | Slices and sprint plan |
+| [docs/03-operating-model.md](docs/03-operating-model.md) | Focus, KPIs, testing gates |
+| [docs/runbook-edge.md](docs/runbook-edge.md) | Field visibility and ops |
 
-- offline-first execution
-- single binary runtime
-- typed application contracts and hexagonal architecture
-- semantic events and audit records as first-class outputs
-- optional integrations built around a stable kernel boundary
+## Workspace layout
 
-## What Works Today
-
-Current implemented capabilities:
-
-- HTTP management API for device lifecycle
-- gateway listing and healthy gateway discovery API
-- downlink enqueue, listing and status retrieval API
-- Semtech UDP ingest path for radio observations
-- local persistence with SQLite schema bootstrap
-- storage profile selection based on runtime constraints
-- retention and buffering strategies for constrained hardware
-- structured audit/event pipeline across API and UDP flows
-
-## Quick Start
-
-Run locally with Cargo:
-
-```bash
-cargo run -p maverick-core
+```
+crates/
+  maverick-domain/              # entities & value objects (no I/O)
+  maverick-core/                # use cases, ports, LoRaWAN 1.0.x Class A capability module
+  maverick-runtime-edge/        # binary: maverick-edge
+  maverick-adapter-radio-udp/   # RadioTransport adapter (stub)
+  maverick-extension-contracts/ # sync envelope contracts (v1.x)
+  maverick-cloud-core/          # hub HubSyncIngest port
+  maverick-integration-tests/    # integration smoke tests
 ```
 
-Health check:
+## Quick start
 
 ```bash
-curl http://localhost:8080/api/v1/health
+cargo build --workspace
+cargo test --workspace
+cargo run -p maverick-runtime-edge --bin maverick-edge -- health
+cargo run -p maverick-runtime-edge --bin maverick-edge -- status
 ```
 
-Create a device:
+## License
 
-```bash
-curl -X POST http://localhost:8080/api/v1/devices \
-	-H "Content-Type: application/json" \
-	-d '{
-		"dev_eui": "0102030405060708",
-		"app_eui": "0807060504030201",
-		"app_key": "AQEBAQEBAQEBAQEBAQEBAQ==",
-		"nwk_key": "AgICAgICAgICAgICAgICAg==",
-		"class": "ClassA"
-	}'
-```
-
-Enqueue a downlink:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/devices/0102030405060708/downlinks \
-	-H "Content-Type: application/json" \
-	-d '{
-		"gateway_eui": "AABBCCDDEEFF0011",
-		"payload": "AQI=",
-		"f_port": 10,
-		"frequency_hz": 868100000,
-		"spreading_factor": 7,
-		"frame_counter": 1,
-		"priority": "Normal"
-	}'
-```
-
-Enqueue a downlink with automatic gateway selection:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/devices/0102030405060708/downlinks \
-	-H "Content-Type: application/json" \
-	-d '{
-		"payload": "AQI=",
-		"f_port": 10,
-		"frequency_hz": 868100000,
-		"spreading_factor": 7,
-		"frame_counter": 2,
-		"priority": "High"
-	}'
-```
-
-## API Surface (Current)
-
-Health:
-
-- GET /api/v1/health
-
-Gateways:
-
-- GET /api/v1/gateways
-- GET /api/v1/gateways?status=Online|Offline|Timeout
-- GET /api/v1/gateways/healthy
-
-Devices:
-
-- POST /api/v1/devices
-- GET /api/v1/devices/:dev_eui
-- PATCH /api/v1/devices/:dev_eui
-- DELETE /api/v1/devices/:dev_eui
-
-Downlinks:
-
-- POST /api/v1/devices/:dev_eui/downlinks
-- GET /api/v1/devices/:dev_eui/downlinks
-- GET /api/v1/devices/:dev_eui/downlinks/:downlink_id
-
-Boundary encoding rules:
-
-- DevEUI and AppEUI as hex strings
-- GatewayEUI as hex string when explicitly provided
-- AppKey and NwkKey as base64 strings
-- domain validation mapped to classified HTTP responses
-
-## Deployment Profiles
-
-Use the same image with different env presets:
-
-- deploy/profiles/edge.env
-- deploy/profiles/gateway.env
-- deploy/profiles/server.env
-
-Run with Docker Compose:
-
-```bash
-docker compose --env-file deploy/profiles/gateway.env up -d
-docker compose --env-file deploy/profiles/edge.env up -d
-docker compose --env-file deploy/profiles/server.env up -d
-```
-
-Or via helper script:
-
-```bash
-./scripts/run-profile.sh edge up
-./scripts/run-profile.sh gateway logs
-./scripts/run-profile.sh server restart
-```
-
-Profile intent:
-
-- edge: minimal footprint (MAVERICK_STORAGE_PROFILE=extreme)
-- gateway: balanced defaults (MAVERICK_STORAGE_PROFILE=auto)
-- server: higher throughput posture (MAVERICK_STORAGE_PROFILE=high)
-
-## Install Options
-
-One-line installer on Linux hosts:
-
-```bash
-curl -sSf https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install.sh | sh
-```
-
-Container deploy:
-
-- Dockerfile
-- docker-compose.yml
-- multi-arch release workflow at .github/workflows/release.yml
-
-## Architecture and Design Docs
-
-- docs/vision.md
-- docs/kernel-boundary.md
-- docs/extensibility.md
-- docs/ai-readiness.md
-- docs/frontier-runtime.md
-- docs/management-api.md
-- docs/udp-ingester.md
-- docs/adr/0001-hexagonal-kernel.md
-
-## Open Source Governance
-
-- LICENSE
-- CONTRIBUTING.md
-- CODE_OF_CONDUCT.md
-- SECURITY.md
-- CHANGELOG.md
-
-## Near-Term Roadmap
-
-Priority items in progress:
-
-- production-grade downlink sender integration with real gateway path
-- gateway selection/failover policy for delivery
-- API auth and operator-facing hardening
-- release/process polish for external contributors
+MIT — see [LICENSE](LICENSE).
