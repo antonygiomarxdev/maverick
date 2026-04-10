@@ -1,0 +1,5 @@
+# Workspace-local Cargo settings. Keeps local commands aligned with CI (.github/workflows/ci.yml).
+
+[alias]
+lint = "clippy --workspace --all-targets --all-features -- -D warnings"
+fmt-check = "fmt --all --check"

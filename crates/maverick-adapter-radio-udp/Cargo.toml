@@ -11,3 +11,6 @@ test = false
 [dependencies]
 maverick-core = { workspace = true }
 async-trait = { workspace = true }
+
+[lints]
+workspace = true

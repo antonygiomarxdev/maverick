@@ -8,3 +8,6 @@ description = "Stable extension and sync envelope contracts (v1.x forward-compat
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[lints]
+workspace = true

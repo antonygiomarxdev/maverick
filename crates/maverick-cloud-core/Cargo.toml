@@ -12,3 +12,6 @@ test = false
 maverick-extension-contracts = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
+
+[lints]
+workspace = true

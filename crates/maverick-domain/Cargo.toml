@@ -12,3 +12,6 @@ thiserror = { workspace = true }
 [features]
 default = ["serde"]
 serde = ["dep:serde"]
+
+[lints]
+workspace = true

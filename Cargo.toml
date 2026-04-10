@@ -37,6 +37,18 @@ thiserror = "1"
 sysinfo = "0.30"
 rusqlite = { version = "0.33", features = ["bundled"] }
 
+# Workspace lint baseline (Cargo `[lints]` / Rust 1.74+). There is no single "Airbnb ESLint"
+# equivalent for Rust; teams combine rustfmt + Clippy `-D warnings` + a small shared deny/warn
+# set. See AGENTS.md and `.cursor/skills/rust-linter-configuration/SKILL.md`.
+[workspace.lints.rust]
+unused_must_use = "deny"
+unsafe_op_in_unsafe_fn = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "warn"
+unimplemented = "warn"
+
 [profile.release]
 lto = true
 codegen-units = 1
