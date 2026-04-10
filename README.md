@@ -49,6 +49,8 @@ chmod +x /tmp/install-maverick.sh
 /tmp/install-maverick.sh --version latest --install-dir /usr/local/bin
 ```
 
+Requires a published [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases); if `curl` returns `404`, there is no release yet (use source build below or wait for `v0.x.y`).
+
 ## Quick start (source build)
 
 ```bash

@@ -27,6 +27,8 @@ uname -m
 
 ## Quick install (recommended)
 
+Prerequisite: **at least one [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases)** must exist. The script downloads release assets (`maverick-<target>.tar.gz`); a green `main` branch alone is not enough until a maintainer publishes a release (usually by pushing a version tag).
+
 Use the helper script from this repo:
 
 ```bash
@@ -34,6 +36,8 @@ curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scr
 chmod +x /tmp/install-maverick.sh
 /tmp/install-maverick.sh --version latest --install-dir /usr/local/bin
 ```
+
+If `--version latest` fails with a `404` from `curl`, there is no `latest` release yet. Use **Manual install** with an explicit `VERSION="vX.Y.Z"` after the first release is published, or build from source (repository `README.md`).
 
 ## Manual install
 
@@ -105,6 +109,8 @@ Docker tag notes:
 
 ## Troubleshooting
 
+- `curl: (22) ... 404` during `--version latest`: no published GitHub Release yet, or GitHub API rate limit (unauthenticated). Open the [releases page](https://github.com/antonygiomarxdev/maverick/releases); if empty, wait for the first release or build from source.
+- `curl: (22) ... 404` when downloading the `.tar.gz`: wrong or unpublished `VERSION`, or asset name mismatch for your architecture.
 - `command not found`: ensure `/usr/local/bin` is in `PATH`.
 - `sha256sum mismatch`: re-download both asset and checksum; do not install.
 - `permission denied` on bind: use non-privileged UDP port or run with proper capabilities.

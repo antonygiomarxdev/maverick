@@ -64,11 +64,33 @@ case "${ARCH_RAW}" in
 esac
 
 if [[ "${VERSION}" == "latest" ]]; then
-  VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -n 1)"
+  LATEST_JSON="$(mktemp)"
+  LATEST_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
+  if ! curl -fsSL "${LATEST_URL}" -o "${LATEST_JSON}"; then
+    rm -f "${LATEST_JSON}"
+    cat >&2 <<EOF
+error: could not resolve latest release from GitHub (curl failed).
+
+Common causes:
+  - No published GitHub Release exists yet for ${REPO_OWNER}/${REPO_NAME}.
+    The install script downloads release assets; tags alone are not enough until CI publishes a Release.
+
+What to do:
+  1) Open https://github.com/${REPO_OWNER}/${REPO_NAME}/releases and confirm a release exists.
+  2) Or install a specific version once published:
+       $0 --version v0.1.0 --install-dir ${INSTALL_DIR}
+  3) Or build from source (see repository README).
+
+API tried: ${LATEST_URL}
+EOF
+    exit 1
+  fi
+  VERSION="$(sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' "${LATEST_JSON}" | head -n 1)"
+  rm -f "${LATEST_JSON}"
 fi
 
 if [[ -z "${VERSION}" ]]; then
-  echo "failed to resolve release version" >&2
+  echo "failed to resolve release version (empty tag_name)" >&2
   exit 1
 fi
 
@@ -91,13 +113,26 @@ curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${TMP_DIR}/${SHA_FILE}"
 tar -xzf "${TMP_DIR}/${ASSET}" -C "${TMP_DIR}"
 chmod +x "${TMP_DIR}/maverick-edge"
 
-if [[ ! -w "${INSTALL_DIR}" ]]; then
-  sudo install -m 0755 "${TMP_DIR}/maverick-edge" "${INSTALL_DIR}/maverick-edge"
+install_one() {
+  local src="$1"
+  local dest_name="$2"
+  if [[ ! -w "${INSTALL_DIR}" ]]; then
+    sudo install -m 0755 "${src}" "${INSTALL_DIR}/${dest_name}"
+  else
+    install -m 0755 "${src}" "${INSTALL_DIR}/${dest_name}"
+  fi
+}
+
+install_one "${TMP_DIR}/maverick-edge" "maverick-edge"
+
+if [[ -f "${TMP_DIR}/maverick-edge-tui" ]]; then
+  chmod +x "${TMP_DIR}/maverick-edge-tui"
+  install_one "${TMP_DIR}/maverick-edge-tui" "maverick-edge-tui"
+  echo "Installed: ${INSTALL_DIR}/maverick-edge and ${INSTALL_DIR}/maverick-edge-tui"
 else
-  install -m 0755 "${TMP_DIR}/maverick-edge" "${INSTALL_DIR}/maverick-edge"
+  echo "Installed: ${INSTALL_DIR}/maverick-edge (no maverick-edge-tui in this tarball)"
 fi
 
-echo "Installed: ${INSTALL_DIR}/maverick-edge"
 echo "Run smoke checks:"
 echo "  maverick-edge --help"
 echo "  maverick-edge status"
