@@ -57,6 +57,7 @@ jobs:
           case "${{ matrix.target }}" in
             aarch64-unknown-linux-gnu)
               # rusqlite/libsqlite3-sys builds C code: need target libc headers, not only the linker.
+              # Without --sysroot, the cross gcc may pick host /usr/include and fail (wrong arch).
               sudo apt-get install -y --no-install-recommends \
                 gcc-aarch64-linux-gnu \
                 libc6-dev-arm64-cross
@@ -64,6 +65,7 @@ jobs:
                 echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
                 echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
                 echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar"
+                echo "CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr/aarch64-linux-gnu"
               } >> "$GITHUB_ENV"
               ;;
             armv7-unknown-linux-gnueabihf)
@@ -74,6 +76,7 @@ jobs:
                 echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc"
                 echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc"
                 echo "AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar"
+                echo "CFLAGS_armv7_unknown_linux_gnueabihf=--sysroot=/usr/arm-linux-gnueabihf"
               } >> "$GITHUB_ENV"
               ;;
           esac

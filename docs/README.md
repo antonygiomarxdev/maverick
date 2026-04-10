@@ -18,6 +18,7 @@ These files define the current official direction:
 9. `docs/install.md` — Linux-first install path (binary-first DX).
 10. `docs/extensions.md` — extension model, compatibility, and version-lock policy.
 11. `docs/release-policy.md` — tag/version strategy, release checklist, and package publication rules.
+12. `scripts/verify-release-cross-builds.sh` — optional Docker smoke build for aarch64/armv7 before tagging (matches Release workflow).
 
 ## Slice evidence (non-canonical supplements)
 

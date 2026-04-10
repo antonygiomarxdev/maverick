@@ -83,6 +83,21 @@ Before creating a tag:
 5. Commit `Cargo.lock` if dependency resolution changed.
 6. Move relevant entries from `Unreleased` in `CHANGELOG.md` into the target version section.
 7. Verify install docs and runbook changes when operator behavior changed.
+8. **Cross targets (aarch64 / armv7):** run the Docker smoke build so `libsqlite3-sys` does not surprise you on GitHub runners (see below).
+
+## Validate release cross-target builds locally
+
+The Release workflow cross-compiles `maverick-runtime-edge` and `maverick-extension-tui` for **aarch64** and **armv7**. Host headers (`/usr/include`) must not be mixed with the cross compiler: CI sets `CFLAGS_*=--sysroot=...` for that reason.
+
+**Before pushing a tag**, from the repository root (requires [Docker](https://docs.docker.com/get-docker/): Linux, WSL2, or Docker Desktop):
+
+```bash
+bash scripts/verify-release-cross-builds.sh
+```
+
+Optional: `RUST_VERIFY_IMAGE=rust:1-bookworm` (default) or another `rust:*-bookworm` image if you need a specific toolchain.
+
+This runs the same Debian packages and environment variables as `.github/workflows/release.yml` for those targets, plus a quick native `x86_64` build inside the container.
 
 ## Post-release checks
 
