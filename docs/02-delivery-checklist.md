@@ -16,6 +16,14 @@ See [`slice-3-evidence.md`](slice-3-evidence.md) for transport resilience (timeo
 
 See [`slice-4-evidence.md`](slice-4-evidence.md) for GWMP `PUSH_DATA` parsing, one-shot inbound runtime ingest wiring (`radio ingest-once`), and half-open circuit transition observability.
 
+## v1 local Linux closure gate (binary-first DX)
+
+- [x] Canonical Linux install path documented (`docs/install.md`) with architecture mapping and smoke checks.
+- [x] Release workflow publishes Linux binary tarballs with `.sha256` checksum files.
+- [x] Runtime exposes supervised gateway ingest mode (`radio ingest-loop`) with CLI/env configuration.
+- [x] Recoverable-failure continuity is covered for transport parse/timeout/circuit behavior.
+- [x] Operator E2E local flow evidence exists (GWMP parse -> core ingest -> SQLite persistence).
+
 ## A. Product lock
 
 - [ ] `docs/00-product-intent.md` accepted as source of truth.

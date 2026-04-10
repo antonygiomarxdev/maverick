@@ -1,5 +1,14 @@
 # Edge Runtime Runbook (v1 baseline)
 
+## Installation path (v1 Linux)
+
+- Canonical install guide: [`install.md`](install.md)
+- Official runtime path: native Linux binary (Docker optional)
+- Default operator interface: `maverick-edge` CLI
+- Optional extension interface: `maverick-edge-tui`
+- Release tag format: `vX.Y.Z`
+- Version rule (v1.x): run core and extension binaries from the same release tag.
+
 ## Local visibility (no external stack)
 
 Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<data-dir>/maverick.db`.
@@ -13,6 +22,7 @@ Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<d
 7. `maverick-edge radio downlink-probe --host <addr> --port <udp>` — sends a single-byte UDP payload through `ResilientRadioTransport` in `maverick-adapter-radio-udp` (timeout / retry / backoff / circuit breaker). JSON result includes `outcome` (`sent` | `failed`) and optional `detail`. Does **not** start the full uplink kernel loop.
 8. `maverick-edge radio ingest-once --bind <addr:port> --timeout-ms <n>` — binds a UDP socket, waits for one Semtech `PUSH_DATA` datagram, parses `rxpk` entries, and calls core ingest use-case boundaries. Output reports `received`, `parsed`, `ingested`, and `failed`.
 9. `maverick-edge radio ingest-loop --bind <addr:port> --read-timeout-ms <n> --max-messages <n>` — supervised local loop for gateway mode. Continues on recoverable read/parse/ingest failures and emits aggregated counters at the end.
+10. `maverick-edge-tui` — optional terminal UX for welcome/config/status/health/start-ingest-loop.
 
 ### Gateway env variables
 
@@ -30,3 +40,19 @@ Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<d
 ## Failure handling principle
 
 Recoverable faults must not require manual process restart. If restart is needed, treat as defect unless documented as non-recoverable.
+
+## Troubleshooting (operator quick actions)
+
+- `bind failed` on ingest commands:
+  - verify UDP port is free (`ss -lunp | rg 17000`),
+  - verify chosen bind address belongs to host.
+- `storage open failed`:
+  - validate `MAVERICK_DATA_DIR` exists and is writable,
+  - check free disk space and ownership.
+- high `failed` counter in `ingest-loop` output:
+  - inspect GWMP payload source (malformed or wrong protocol),
+  - lower `MAVERICK_GWMP_LOOP_READ_TIMEOUT_MS` if long idle periods cause operational confusion,
+  - keep process running; recoverable failures should not terminate the loop.
+- no uplinks persisted:
+  - confirm session provisioning exists for incoming `dev_addr` values (ingest rejects unknown sessions),
+  - verify `status` / `health` output and database file presence in data dir.

@@ -25,6 +25,7 @@ Move transport from probe-only behavior to a realistic inbound path by parsing S
 | Half-open closes on success | `maverick-adapter-radio-udp::resilient::tests` | Failing-first transport recovers after open window. |
 | Parse failure continuity | `maverick-integration-tests/tests/radio_transport_resilience.rs` | Malformed packet returns `InvalidInput` without panic. |
 | Recovery after circuit open | `maverick-integration-tests/tests/radio_transport_resilience.rs` | Circuit transitions back to `Closed` after successful post-open trial. |
+| Operator local E2E flow | `maverick-integration-tests/tests/operator_local_gateway_e2e.rs` | GWMP parse -> ingest use case -> SQLite persistence in one test. |
 
 ## Verification commands (executed)
 
