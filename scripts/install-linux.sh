@@ -74,15 +74,19 @@ if [[ "${VERSION}" == "latest" ]]; then
     cat >&2 <<EOF
 error: could not resolve latest release from GitHub (curl failed).
 
-Common causes:
-  - No published GitHub Release exists yet for ${REPO_OWNER}/${REPO_NAME}.
-    The install script downloads release assets; tags alone are not enough until CI publishes a Release.
+Why:
+  GitHub only exposes /releases/latest after at least one Release exists with assets.
+  Releases are created by this repo's workflow when a maintainer pushes a version tag (e.g. v0.1.0).
+  Until then, this installer cannot download binaries.
 
 What to do:
-  1) Open https://github.com/${REPO_OWNER}/${REPO_NAME}/releases and confirm a release exists.
-  2) Or install a specific version once published:
-       $0 --version v0.1.0 --install-dir ${INSTALL_DIR}
-  3) Or build from source (see repository README).
+  1) Maintainer: push a tag to trigger the release workflow, then wait for CI to finish:
+       git tag v0.1.0 && git push origin v0.1.0
+     See: https://github.com/${REPO_OWNER}/${REPO_NAME}/actions
+  2) Everyone: open https://github.com/${REPO_OWNER}/${REPO_NAME}/releases — if empty, step (1) is still needed.
+  3) After a release exists, install a specific version (one-liner):
+       curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/scripts/install-linux.sh" | bash -s -- --version v0.1.0 --install-dir ${INSTALL_DIR}
+  4) Or build from source (repository README).
 
 API tried: ${LATEST_URL}
 EOF
