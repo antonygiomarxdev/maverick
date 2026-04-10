@@ -10,6 +10,7 @@ Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<d
 4. `maverick-edge probe` — hardware capability JSON for support.
 5. `maverick-edge storage-policy <profile>` — effective `StoragePolicy` JSON.
 6. `maverick-edge storage-pressure` — JSON `StoragePressureSnapshot` when the DB exists.
+7. `maverick-edge radio downlink-probe --host <addr> --port <udp>` — sends a single-byte UDP payload through `ResilientRadioTransport` in `maverick-adapter-radio-udp` (timeout / retry / backoff / circuit breaker). JSON result includes `outcome` (`sent` | `failed`) and optional `detail`. Does **not** start the full uplink kernel loop.
 
 ## Degradation signals
 

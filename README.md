@@ -40,6 +40,8 @@ cargo run -p maverick-runtime-edge --bin maverick-edge -- status
 # Optional: set data directory for SQLite (default ./data, file maverick.db)
 $env:MAVERICK_DATA_DIR = ".\data"
 cargo run -p maverick-runtime-edge --bin maverick-edge -- storage-pressure
+# UDP downlink probe (resilient RadioTransport); send may succeed even if nothing listens (UDP)
+cargo run -p maverick-runtime-edge --bin maverick-edge -- radio downlink-probe --host 127.0.0.1 --port 17000
 ```
 
 ## License

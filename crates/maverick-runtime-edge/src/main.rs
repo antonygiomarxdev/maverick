@@ -1,18 +1,22 @@
 //! Edge runtime entrypoint: local CLI for visibility baseline (v1).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use maverick_adapter_persistence_sqlite::{SqlitePersistence, SqlitePersistenceOptions};
-use maverick_core::health::{ComponentHealth, HealthState, HealthStatus};
-use maverick_core::{InstallProfile, StoragePressureLevel, StoragePressureSource};
-use tracing_subscriber::EnvFilter;
+use maverick_core::InstallProfile;
 
 mod cli_constants;
+mod commands;
+mod edge_json;
 mod probe;
 
-use cli_constants::{DEFAULT_DATA_DIR, EDGE_DB_FILENAME, HEALTH_COMPONENT_STORAGE};
-use probe::{health_from_probe, total_disk_bytes_hint, HardwareCapabilities};
+use cli_constants::{
+    DEFAULT_DATA_DIR, DEFAULT_RADIO_PROBE_HOST, DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
+};
+use commands::{
+    run_health, run_probe, run_radio_downlink_probe, run_recent_errors, run_status,
+    run_storage_policy, run_storage_pressure,
+};
 
 #[derive(Parser)]
 #[command(name = "maverick-edge")]
@@ -45,6 +49,22 @@ enum Commands {
     },
     /// Storage pressure snapshot when `maverick.db` exists under data dir
     StoragePressure,
+    /// Radio / transport diagnostics (adapter wiring; does not start the full kernel loop)
+    Radio {
+        #[command(subcommand)]
+        cmd: RadioCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum RadioCmd {
+    /// Send a minimal UDP downlink probe through the resilient transport wrapper
+    DownlinkProbe {
+        #[arg(long, default_value = DEFAULT_RADIO_PROBE_HOST)]
+        host: String,
+        #[arg(long, default_value_t = DEFAULT_RADIO_PROBE_PORT)]
+        port: u16,
+    },
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -64,142 +84,23 @@ impl From<ProfileArg> for InstallProfile {
     }
 }
 
-fn storage_level_to_health(level: StoragePressureLevel) -> HealthStatus {
-    match level {
-        StoragePressureLevel::Normal => HealthStatus::Healthy,
-        StoragePressureLevel::Elevated
-        | StoragePressureLevel::Critical
-        | StoragePressureLevel::HardLimit => HealthStatus::Degraded,
-    }
-}
-
-fn db_path(data_dir: &Path) -> PathBuf {
-    data_dir.join(EDGE_DB_FILENAME)
-}
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
     let cli = Cli::parse();
+    let db_file = EDGE_DB_FILENAME;
     match cli.command {
-        Commands::Status => {
-            let cap = HardwareCapabilities::probe();
-            let dbp = db_path(&cli.data_dir);
-            let storage = if dbp.exists() {
-                let profile = cap.suggested_install_profile();
-                let policy = profile.default_storage_policy();
-                let opts = SqlitePersistenceOptions {
-                    total_disk_bytes: total_disk_bytes_hint(),
-                    ..SqlitePersistenceOptions::default()
-                };
-                match SqlitePersistence::open(&dbp, policy, opts) {
-                    Ok(store) => {
-                        let snap = store.pressure_snapshot().await;
-                        Some(serde_json::json!({
-                            "present": true,
-                            "level": snap.level,
-                            "db_bytes": snap.db_bytes,
-                            "total_disk_bytes": snap.total_disk_bytes,
-                            "detail": snap.detail,
-                        }))
-                    }
-                    Err(e) => Some(serde_json::json!({
-                        "present": true,
-                        "error": e.to_string(),
-                    })),
-                }
-            } else {
-                Some(serde_json::json!({ "present": false }))
-            };
-            println!(
-                "{}",
-                serde_json::json!({
-                    "role": "edge",
-                    "data_dir": cli.data_dir,
-                    "suggested_profile": format!("{:?}", cap.suggested_install_profile()),
-                    "memory_bytes": cap.total_memory_bytes,
-                    "storage": storage,
-                })
-            );
-        }
-        Commands::Health => {
-            let cap = HardwareCapabilities::probe();
-            let mut components = health_from_probe(&cap).components;
-            let dbp = db_path(&cli.data_dir);
-            if dbp.exists() {
-                let profile = cap.suggested_install_profile();
-                let policy = profile.default_storage_policy();
-                let opts = SqlitePersistenceOptions {
-                    total_disk_bytes: total_disk_bytes_hint(),
-                    ..SqlitePersistenceOptions::default()
-                };
-                match SqlitePersistence::open(&dbp, policy, opts) {
-                    Ok(store) => {
-                        let snap = store.pressure_snapshot().await;
-                        components.push(ComponentHealth {
-                            name: HEALTH_COMPONENT_STORAGE.to_string(),
-                            status: storage_level_to_health(snap.level),
-                            detail: snap.detail,
-                        });
-                    }
-                    Err(e) => {
-                        components.push(ComponentHealth {
-                            name: HEALTH_COMPONENT_STORAGE.to_string(),
-                            status: HealthStatus::Unhealthy,
-                            detail: Some(format!("open failed: {e}")),
-                        });
-                    }
-                }
-            }
-            let h = HealthState::new(components);
-            println!("{}", serde_json::to_string_pretty(&h).unwrap());
-        }
-        Commands::RecentErrors { lines } => {
-            println!(
-                "{{\"message\":\"recent-errors not yet wired to log file\",\"lines_requested\":{}}}",
-                lines
-            );
-        }
-        Commands::Probe => {
-            let cap = HardwareCapabilities::probe();
-            println!("{}", serde_json::to_string_pretty(&cap).unwrap());
-        }
-        Commands::StoragePolicy { profile } => {
-            let p: InstallProfile = profile.into();
-            let pol = p.default_storage_policy();
-            println!("{}", serde_json::to_string_pretty(&pol).unwrap());
-        }
-        Commands::StoragePressure => {
-            let dbp = db_path(&cli.data_dir);
-            if !dbp.exists() {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "present": false,
-                        "data_dir": cli.data_dir,
-                    })
-                );
-                return;
-            }
-            let cap = HardwareCapabilities::probe();
-            let profile = cap.suggested_install_profile();
-            let policy = profile.default_storage_policy();
-            let opts = SqlitePersistenceOptions {
-                total_disk_bytes: total_disk_bytes_hint(),
-                ..SqlitePersistenceOptions::default()
-            };
-            match SqlitePersistence::open(&dbp, policy, opts) {
-                Ok(store) => {
-                    let snap = store.pressure_snapshot().await;
-                    println!("{}", serde_json::to_string_pretty(&snap).unwrap());
-                }
-                Err(e) => {
-                    println!("{{\"error\":{:?}}}", e.to_string());
-                }
-            }
-        }
+        Commands::Status => run_status(cli.data_dir, db_file).await,
+        Commands::Health => run_health(cli.data_dir, db_file).await,
+        Commands::RecentErrors { lines } => run_recent_errors(lines),
+        Commands::Probe => run_probe(),
+        Commands::StoragePolicy { profile } => run_storage_policy(profile.into()),
+        Commands::StoragePressure => run_storage_pressure(cli.data_dir, db_file).await,
+        Commands::Radio { cmd } => match cmd {
+            RadioCmd::DownlinkProbe { host, port } => run_radio_downlink_probe(host, port).await,
+        },
     }
 }

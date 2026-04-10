@@ -8,6 +8,10 @@ Use this checklist before declaring v1 complete.
 
 See [`slice-2-evidence.md`](slice-2-evidence.md) for what was proven in the persistence/retention slice (SQLite adapter, retention caps, busy retry test, CLI storage visibility). Remaining checklist items below still apply to **full v1** unless explicitly marked done in review.
 
+## Slice 3 incremental evidence
+
+See [`slice-3-evidence.md`](slice-3-evidence.md) for transport resilience (timeout / retry / backoff / circuit breaker on `RadioTransport`), UDP downlink probe CLI, SQLite persistence SRP split, and fault-oriented adapter tests. Sprint review gate: [`code-review-checklist.md`](code-review-checklist.md).
+
 ## A. Product lock
 
 - [ ] `docs/00-product-intent.md` accepted as source of truth.

@@ -14,10 +14,12 @@ These files define the current official direction:
 5. `docs/04-sprint-1-executable-plan.md`
 6. `docs/runbook-edge.md`
 7. `docs/05-test-program.md`
+8. `docs/code-review-checklist.md` — PR/sprint gate (clean code, SOLID/hexagonal, no magic values).
 
 ## Slice evidence (non-canonical supplements)
 
 - `docs/slice-2-evidence.md` — persistence/retention slice outcomes and verification notes.
+- `docs/slice-3-evidence.md` — transport resilience (UDP downlink probe, circuit breaker, tests).
 
 If any other document conflicts with these, the canonical set wins.
 
@@ -36,7 +38,7 @@ Maverick v1 is a runtime-first, offline-first edge LNS with:
 - `crates/maverick-core` — use cases, ports, protocol capability modules, storage policy
 - `crates/maverick-runtime-edge` — edge binary `maverick-edge` (CLI visibility baseline)
 - `crates/maverick-adapter-persistence-sqlite` — durable SQLite adapter for core ports + storage pressure
-- `crates/maverick-adapter-radio-udp` — radio transport adapter skeleton
+- `crates/maverick-adapter-radio-udp` — UDP downlink + resilient `RadioTransport` wrapper
 - `crates/maverick-extension-contracts` — versioned sync/event envelopes for v1.x
 - `crates/maverick-cloud-core` — hub-side sync ingest port (no edge dependency)
 - `crates/maverick-integration-tests` — cross-crate smoke tests
