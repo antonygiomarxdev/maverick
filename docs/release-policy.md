@@ -7,6 +7,24 @@ Status: Active
 
 Provide predictable, reproducible releases for operators and contributors.
 
+## When GitHub Actions run
+
+| Workflow | File | When it runs |
+|----------|------|----------------|
+| **CI** | `.github/workflows/ci.yml` | Every push to `main` and every pull request. |
+| **Release** | `.github/workflows/release.yml` | **Only** when a version tag matching `v*` is **pushed**, or when a maintainer runs **Release** manually (**Actions** → **Release** → **Run workflow**) and enters a `version_tag` (e.g. `v0.1.0`). |
+
+Pushing commits to `main` without a tag **does not** build release tarballs or create a GitHub Release. That is why `install-linux.sh --version latest` returns 404 until the first successful Release workflow completes.
+
+### First release (pick one)
+
+1. **Tag push (typical):** after `main` has what you want to ship, on your machine:
+   - `git tag v0.1.0`
+   - `git push origin v0.1.0`
+2. **Manual run:** GitHub → **Actions** → **Release** → **Run workflow**, set **version tag** to `v0.1.0`, run on `main` (or the branch you intend to ship).
+
+Then open **Actions** and confirm the **Release** workflow is green; after that, **Releases** should list assets and `/releases/latest` will work for the installer.
+
 ## Project phase: public beta
 
 Maverick is in **public beta**. Shipping is driven by **annotated git tags** `v0.x.y`:
