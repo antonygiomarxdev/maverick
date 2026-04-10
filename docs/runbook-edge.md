@@ -11,6 +11,7 @@ Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<d
 5. `maverick-edge storage-policy <profile>` — effective `StoragePolicy` JSON.
 6. `maverick-edge storage-pressure` — JSON `StoragePressureSnapshot` when the DB exists.
 7. `maverick-edge radio downlink-probe --host <addr> --port <udp>` — sends a single-byte UDP payload through `ResilientRadioTransport` in `maverick-adapter-radio-udp` (timeout / retry / backoff / circuit breaker). JSON result includes `outcome` (`sent` | `failed`) and optional `detail`. Does **not** start the full uplink kernel loop.
+8. `maverick-edge radio ingest-once --bind <addr:port> --timeout-ms <n>` — binds a UDP socket, waits for one Semtech `PUSH_DATA` datagram, parses `rxpk` entries, and calls core ingest use-case boundaries. Output reports `received`, `parsed`, `ingested`, and `failed`.
 
 ## Degradation signals
 

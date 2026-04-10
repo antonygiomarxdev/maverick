@@ -12,6 +12,10 @@ See [`slice-2-evidence.md`](slice-2-evidence.md) for what was proven in the pers
 
 See [`slice-3-evidence.md`](slice-3-evidence.md) for transport resilience (timeout / retry / backoff / circuit breaker on `RadioTransport`), UDP downlink probe CLI, SQLite persistence SRP split, and fault-oriented adapter tests. Sprint review gate: [`code-review-checklist.md`](code-review-checklist.md).
 
+## Slice 4 incremental evidence
+
+See [`slice-4-evidence.md`](slice-4-evidence.md) for GWMP `PUSH_DATA` parsing, one-shot inbound runtime ingest wiring (`radio ingest-once`), and half-open circuit transition observability.
+
 ## A. Product lock
 
 - [ ] `docs/00-product-intent.md` accepted as source of truth.

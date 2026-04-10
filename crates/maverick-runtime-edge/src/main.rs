@@ -11,11 +11,12 @@ mod edge_json;
 mod probe;
 
 use cli_constants::{
-    DEFAULT_DATA_DIR, DEFAULT_RADIO_PROBE_HOST, DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
+    DEFAULT_DATA_DIR, DEFAULT_GWMP_BIND_ADDR, DEFAULT_GWMP_INGEST_TIMEOUT_MS,
+    DEFAULT_RADIO_PROBE_HOST, DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
 };
 use commands::{
-    run_health, run_probe, run_radio_downlink_probe, run_recent_errors, run_status,
-    run_storage_policy, run_storage_pressure,
+    run_health, run_probe, run_radio_downlink_probe, run_radio_ingest_once, run_recent_errors,
+    run_status, run_storage_policy, run_storage_pressure,
 };
 
 #[derive(Parser)]
@@ -65,6 +66,13 @@ enum RadioCmd {
         #[arg(long, default_value_t = DEFAULT_RADIO_PROBE_PORT)]
         port: u16,
     },
+    /// Listen for one Semtech PUSH_DATA datagram and ingest observations through core use case.
+    IngestOnce {
+        #[arg(long, default_value = DEFAULT_GWMP_BIND_ADDR)]
+        bind: String,
+        #[arg(long, default_value_t = DEFAULT_GWMP_INGEST_TIMEOUT_MS)]
+        timeout_ms: u64,
+    },
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -101,6 +109,9 @@ async fn main() {
         Commands::StoragePressure => run_storage_pressure(cli.data_dir, db_file).await,
         Commands::Radio { cmd } => match cmd {
             RadioCmd::DownlinkProbe { host, port } => run_radio_downlink_probe(host, port).await,
+            RadioCmd::IngestOnce { bind, timeout_ms } => {
+                run_radio_ingest_once(bind, timeout_ms, cli.data_dir, db_file).await
+            }
         },
     }
 }

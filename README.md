@@ -42,6 +42,8 @@ $env:MAVERICK_DATA_DIR = ".\data"
 cargo run -p maverick-runtime-edge --bin maverick-edge -- storage-pressure
 # UDP downlink probe (resilient RadioTransport); send may succeed even if nothing listens (UDP)
 cargo run -p maverick-runtime-edge --bin maverick-edge -- radio downlink-probe --host 127.0.0.1 --port 17000
+# One-shot GWMP ingest path through core use case (waits for one UDP packet)
+cargo run -p maverick-runtime-edge --bin maverick-edge -- radio ingest-once --bind 0.0.0.0:17000 --timeout-ms 5000
 ```
 
 ## License

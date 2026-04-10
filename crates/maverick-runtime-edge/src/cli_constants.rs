@@ -19,3 +19,9 @@ pub const STORAGE_OPEN_FAILED_PREFIX: &str = "open failed: ";
 
 /// Single-byte UDP probe payload (Semtech GWMP parsing is future work).
 pub const RADIO_PROBE_PAYLOAD_BYTE: u8 = 0x01;
+
+/// Default bind address for one-shot GWMP uplink ingest.
+pub const DEFAULT_GWMP_BIND_ADDR: &str = "0.0.0.0:17000";
+
+/// Timeout window for one-shot GWMP listen mode in CLI.
+pub const DEFAULT_GWMP_INGEST_TIMEOUT_MS: u64 = 5_000;

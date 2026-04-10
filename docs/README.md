@@ -20,6 +20,7 @@ These files define the current official direction:
 
 - `docs/slice-2-evidence.md` — persistence/retention slice outcomes and verification notes.
 - `docs/slice-3-evidence.md` — transport resilience (UDP downlink probe, circuit breaker, tests).
+- `docs/slice-4-evidence.md` — GWMP ingest path, circuit transition observability, and transport realism tests.
 
 If any other document conflicts with these, the canonical set wins.
 
@@ -38,7 +39,7 @@ Maverick v1 is a runtime-first, offline-first edge LNS with:
 - `crates/maverick-core` — use cases, ports, protocol capability modules, storage policy
 - `crates/maverick-runtime-edge` — edge binary `maverick-edge` (CLI visibility baseline)
 - `crates/maverick-adapter-persistence-sqlite` — durable SQLite adapter for core ports + storage pressure
-- `crates/maverick-adapter-radio-udp` — UDP downlink + resilient `RadioTransport` wrapper
+- `crates/maverick-adapter-radio-udp` — UDP adapter with resilient transport + GWMP uplink parsing
 - `crates/maverick-extension-contracts` — versioned sync/event envelopes for v1.x
 - `crates/maverick-cloud-core` — hub-side sync ingest port (no edge dependency)
 - `crates/maverick-integration-tests` — cross-crate smoke tests

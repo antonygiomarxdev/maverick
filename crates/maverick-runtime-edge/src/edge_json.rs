@@ -21,6 +21,12 @@ pub(crate) enum EdgeJsonKey {
     GatewayHost,
     GatewayPort,
     PayloadBytes,
+    ListenBind,
+    TimeoutMs,
+    Received,
+    Parsed,
+    Ingested,
+    Failed,
 }
 
 impl EdgeJsonKey {
@@ -41,6 +47,12 @@ impl EdgeJsonKey {
             EdgeJsonKey::GatewayHost => "gateway_host",
             EdgeJsonKey::GatewayPort => "gateway_port",
             EdgeJsonKey::PayloadBytes => "payload_bytes",
+            EdgeJsonKey::ListenBind => "listen_bind",
+            EdgeJsonKey::TimeoutMs => "timeout_ms",
+            EdgeJsonKey::Received => "received",
+            EdgeJsonKey::Parsed => "parsed",
+            EdgeJsonKey::Ingested => "ingested",
+            EdgeJsonKey::Failed => "failed",
         }
     }
 }
@@ -158,6 +170,28 @@ pub(crate) fn radio_probe_result(
     m.insert(key(EdgeJsonKey::GatewayHost), json!(host));
     m.insert(key(EdgeJsonKey::GatewayPort), json!(port));
     m.insert(key(EdgeJsonKey::PayloadBytes), json!(payload_len));
+    if let Some(d) = detail {
+        m.insert(key(EdgeJsonKey::Detail), json!(d));
+    }
+    Value::Object(m)
+}
+
+pub(crate) fn radio_ingest_result(
+    bind: &str,
+    timeout_ms: u64,
+    received: usize,
+    parsed: usize,
+    ingested: usize,
+    failed: usize,
+    detail: Option<String>,
+) -> Value {
+    let mut m = Map::new();
+    m.insert(key(EdgeJsonKey::ListenBind), json!(bind));
+    m.insert(key(EdgeJsonKey::TimeoutMs), json!(timeout_ms));
+    m.insert(key(EdgeJsonKey::Received), json!(received));
+    m.insert(key(EdgeJsonKey::Parsed), json!(parsed));
+    m.insert(key(EdgeJsonKey::Ingested), json!(ingested));
+    m.insert(key(EdgeJsonKey::Failed), json!(failed));
     if let Some(d) = detail {
         m.insert(key(EdgeJsonKey::Detail), json!(d));
     }

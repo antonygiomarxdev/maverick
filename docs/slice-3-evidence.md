@@ -44,7 +44,5 @@ cargo test -p maverick-adapter-radio-udp
 
 ## Residual risks / follow-ups
 
-- **Semtech GWMP / JSON protocol** is not implemented; payload is raw bytes for boundary testing only.
-- **Half-open circuit** is modeled as “open until instant”; no separate half-open probe counter (acceptable for v1 slice).
-- **Uplink receive path** and full ingest loop are unchanged; transport resilience applies to outbound/downlink probe and future schedulers.
-- **Windows Application Control** may block `maverick-integration-tests` integration binaries (os error 4551); use crate-level tests above for CI on affected machines.
+- Semtech GWMP inbound parsing and one-shot ingest were moved to Slice 4; details now tracked in `docs/slice-4-evidence.md`.
+- Long-running supervised ingest loop (beyond one-shot diagnostic command) remains future work.

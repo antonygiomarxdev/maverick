@@ -3,13 +3,19 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use maverick_adapter_persistence_sqlite::{SqlitePersistence, SqlitePersistenceOptions};
 use maverick_adapter_radio_udp::{ResiliencePolicy, ResilientRadioTransport, UdpDownlinkTransport};
 use maverick_core::health::{ComponentHealth, HealthState, HealthStatus};
-use maverick_core::ports::{DownlinkFrame, RadioTransport};
+use maverick_core::ports::{
+    AuditSink, DownlinkFrame, RadioTransport, SessionRepository, UplinkRepository,
+};
+use maverick_core::protocol::LoRaWAN10xClassA;
+use maverick_core::use_cases::IngestUplink;
 use maverick_core::{InstallProfile, StoragePressureLevel, StoragePressureSource};
 use maverick_domain::{identifiers::Eui64, DevAddr, GatewayEui};
+use tokio::net::UdpSocket;
 
 use crate::cli_constants::{
     HEALTH_COMPONENT_STORAGE, RADIO_PROBE_PAYLOAD_BYTE, RECENT_ERRORS_NOT_WIRED_MESSAGE,
@@ -217,4 +223,127 @@ pub(crate) async fn run_radio_downlink_probe(host: String, port: u16) {
             println!("{}", serde_json::to_string(&v).expect("probe json"));
         }
     }
+}
+
+pub(crate) async fn run_radio_ingest_once(
+    bind: String,
+    timeout_ms: u64,
+    data_dir: PathBuf,
+    db_file: &str,
+) {
+    let socket = match UdpSocket::bind(bind.as_str()).await {
+        Ok(v) => v,
+        Err(e) => {
+            let out = edge_json::radio_ingest_result(
+                bind.as_str(),
+                timeout_ms,
+                0,
+                0,
+                0,
+                1,
+                Some(format!("bind failed: {e}")),
+            );
+            println!("{}", serde_json::to_string(&out).expect("ingest result"));
+            return;
+        }
+    };
+    let mut buf = vec![0_u8; 4096];
+    let timeout = Duration::from_millis(timeout_ms.max(1));
+    let recv_res = tokio::time::timeout(timeout, socket.recv_from(&mut buf)).await;
+    let (n, _addr) = match recv_res {
+        Ok(Ok(v)) => v,
+        Ok(Err(e)) => {
+            let out = edge_json::radio_ingest_result(
+                bind.as_str(),
+                timeout_ms,
+                0,
+                0,
+                0,
+                1,
+                Some(format!("recv failed: {e}")),
+            );
+            println!("{}", serde_json::to_string(&out).expect("ingest result"));
+            return;
+        }
+        Err(_) => {
+            let out = edge_json::radio_ingest_result(
+                bind.as_str(),
+                timeout_ms,
+                0,
+                0,
+                0,
+                0,
+                Some("listen timeout".to_string()),
+            );
+            println!("{}", serde_json::to_string(&out).expect("ingest result"));
+            return;
+        }
+    };
+
+    let dbp = db_path(&data_dir, db_file);
+    let cap = HardwareCapabilities::probe();
+    let profile = cap.suggested_install_profile();
+    let policy = profile.default_storage_policy();
+    let store = match SqlitePersistence::open(&dbp, policy, sqlite_opts()) {
+        Ok(v) => Arc::new(v),
+        Err(e) => {
+            let out = edge_json::radio_ingest_result(
+                bind.as_str(),
+                timeout_ms,
+                1,
+                0,
+                0,
+                1,
+                Some(format!("storage open failed: {e}")),
+            );
+            println!("{}", serde_json::to_string(&out).expect("ingest result"));
+            return;
+        }
+    };
+    let sessions: Arc<dyn SessionRepository> = store.clone();
+    let uplinks: Arc<dyn UplinkRepository> = store.clone();
+    let audit: Arc<dyn AuditSink> = store.clone();
+    let svc = IngestUplink {
+        sessions,
+        uplinks,
+        audit,
+        protocol: Arc::new(LoRaWAN10xClassA),
+    };
+
+    let parsed = match maverick_adapter_radio_udp::parse_push_data(&buf[..n]) {
+        Ok(v) => v,
+        Err(e) => {
+            let out = edge_json::radio_ingest_result(
+                bind.as_str(),
+                timeout_ms,
+                1,
+                0,
+                0,
+                1,
+                Some(e.to_string()),
+            );
+            println!("{}", serde_json::to_string(&out).expect("ingest result"));
+            return;
+        }
+    };
+
+    let mut ingested = 0_usize;
+    let mut failed = 0_usize;
+    for obs in parsed.observations {
+        match svc.execute(obs).await {
+            Ok(()) => ingested += 1,
+            Err(_) => failed += 1,
+        }
+    }
+
+    let out = edge_json::radio_ingest_result(
+        bind.as_str(),
+        timeout_ms,
+        1,
+        ingested + failed,
+        ingested,
+        failed,
+        None,
+    );
+    println!("{}", serde_json::to_string(&out).expect("ingest result"));
 }
