@@ -15,6 +15,8 @@ These files define the current official direction:
 6. `docs/runbook-edge.md`
 7. `docs/05-test-program.md`
 8. `docs/code-review-checklist.md` — PR/sprint gate (clean code, SOLID/hexagonal, no magic values).
+9. `docs/install.md` — Linux-first install path (binary-first DX).
+10. `docs/extensions.md` — extension model, compatibility, and version-lock policy.
 
 ## Slice evidence (non-canonical supplements)
 
@@ -37,6 +39,7 @@ Maverick v1 is a runtime-first, offline-first edge LNS with:
 
 - `crates/maverick-domain` — domain types only
 - `crates/maverick-core` — use cases, ports, protocol capability modules, storage policy
+- `crates/maverick-extension-tui` — optional terminal UX extension (`maverick-edge-tui`)
 - `crates/maverick-runtime-edge` — edge binary `maverick-edge` (CLI visibility baseline)
 - `crates/maverick-adapter-persistence-sqlite` — durable SQLite adapter for core ports + storage pressure
 - `crates/maverick-adapter-radio-udp` — UDP adapter with resilient transport + GWMP uplink parsing
