@@ -17,6 +17,7 @@ These files define the current official direction:
 8. `docs/code-review-checklist.md` — PR/sprint gate (clean code, SOLID/hexagonal, no magic values).
 9. `docs/install.md` — Linux-first install path (binary-first DX).
 10. `docs/extensions.md` — extension model, compatibility, and version-lock policy.
+11. `docs/release-policy.md` — tag/version strategy, release checklist, and package publication rules.
 
 ## Slice evidence (non-canonical supplements)
 
