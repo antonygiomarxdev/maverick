@@ -21,7 +21,7 @@ use crate::cli_constants::{
     HEALTH_COMPONENT_STORAGE, RADIO_PROBE_PAYLOAD_BYTE, RECENT_ERRORS_NOT_WIRED_MESSAGE,
     STORAGE_OPEN_FAILED_PREFIX,
 };
-use crate::edge_json::{self, RadioProbeOutcome, RecentErrorsStubResponse};
+use crate::edge_json::{self, RadioIngestCounters, RadioProbeOutcome, RecentErrorsStubResponse};
 use crate::probe::{health_from_probe, total_disk_bytes_hint, HardwareCapabilities};
 
 pub(crate) fn db_path(data_dir: &Path, edge_db_filename: &str) -> PathBuf {
@@ -346,4 +346,118 @@ pub(crate) async fn run_radio_ingest_once(
         None,
     );
     println!("{}", serde_json::to_string(&out).expect("ingest result"));
+}
+
+pub(crate) async fn run_radio_ingest_supervised(
+    bind: String,
+    read_timeout_ms: u64,
+    max_messages: u32,
+    data_dir: PathBuf,
+    db_file: &str,
+) {
+    let socket = match UdpSocket::bind(bind.as_str()).await {
+        Ok(v) => v,
+        Err(e) => {
+            let out = edge_json::radio_ingest_loop_result(
+                bind.as_str(),
+                read_timeout_ms,
+                RadioIngestCounters {
+                    looped: true,
+                    failed: 1,
+                    ..RadioIngestCounters::default()
+                },
+                Some(format!("bind failed: {e}")),
+            );
+            println!(
+                "{}",
+                serde_json::to_string(&out).expect("ingest-loop result")
+            );
+            return;
+        }
+    };
+    let dbp = db_path(&data_dir, db_file);
+    let cap = HardwareCapabilities::probe();
+    let profile = cap.suggested_install_profile();
+    let policy = profile.default_storage_policy();
+    let store = match SqlitePersistence::open(&dbp, policy, sqlite_opts()) {
+        Ok(v) => Arc::new(v),
+        Err(e) => {
+            let out = edge_json::radio_ingest_loop_result(
+                bind.as_str(),
+                read_timeout_ms,
+                RadioIngestCounters {
+                    looped: true,
+                    failed: 1,
+                    ..RadioIngestCounters::default()
+                },
+                Some(format!("storage open failed: {e}")),
+            );
+            println!(
+                "{}",
+                serde_json::to_string(&out).expect("ingest-loop result")
+            );
+            return;
+        }
+    };
+    let sessions: Arc<dyn SessionRepository> = store.clone();
+    let uplinks: Arc<dyn UplinkRepository> = store.clone();
+    let audit: Arc<dyn AuditSink> = store.clone();
+    let svc = IngestUplink {
+        sessions,
+        uplinks,
+        audit,
+        protocol: Arc::new(LoRaWAN10xClassA),
+    };
+
+    let timeout = Duration::from_millis(read_timeout_ms.max(1));
+    let mut received = 0_usize;
+    let mut parsed = 0_usize;
+    let mut ingested = 0_usize;
+    let mut failed = 0_usize;
+    let mut buf = vec![0_u8; 4096];
+    for _ in 0..max_messages.max(1) {
+        let recv_res = tokio::time::timeout(timeout, socket.recv_from(&mut buf)).await;
+        let (n, _addr) = match recv_res {
+            Ok(Ok(v)) => v,
+            Ok(Err(_)) => {
+                failed += 1;
+                continue;
+            }
+            Err(_) => {
+                // Idle timeout is expected in supervised mode.
+                continue;
+            }
+        };
+        received += 1;
+        match maverick_adapter_radio_udp::parse_push_data(&buf[..n]) {
+            Ok(batch) => {
+                parsed += batch.observations.len();
+                for obs in batch.observations {
+                    match svc.execute(obs).await {
+                        Ok(()) => ingested += 1,
+                        Err(_) => failed += 1,
+                    }
+                }
+            }
+            Err(_) => {
+                failed += 1;
+            }
+        }
+    }
+    let out = edge_json::radio_ingest_loop_result(
+        bind.as_str(),
+        read_timeout_ms,
+        RadioIngestCounters {
+            looped: true,
+            received,
+            parsed,
+            ingested,
+            failed,
+        },
+        None,
+    );
+    println!(
+        "{}",
+        serde_json::to_string(&out).expect("ingest-loop result")
+    );
 }

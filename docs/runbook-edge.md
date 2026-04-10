@@ -12,6 +12,14 @@ Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<d
 6. `maverick-edge storage-pressure` — JSON `StoragePressureSnapshot` when the DB exists.
 7. `maverick-edge radio downlink-probe --host <addr> --port <udp>` — sends a single-byte UDP payload through `ResilientRadioTransport` in `maverick-adapter-radio-udp` (timeout / retry / backoff / circuit breaker). JSON result includes `outcome` (`sent` | `failed`) and optional `detail`. Does **not** start the full uplink kernel loop.
 8. `maverick-edge radio ingest-once --bind <addr:port> --timeout-ms <n>` — binds a UDP socket, waits for one Semtech `PUSH_DATA` datagram, parses `rxpk` entries, and calls core ingest use-case boundaries. Output reports `received`, `parsed`, `ingested`, and `failed`.
+9. `maverick-edge radio ingest-loop --bind <addr:port> --read-timeout-ms <n> --max-messages <n>` — supervised local loop for gateway mode. Continues on recoverable read/parse/ingest failures and emits aggregated counters at the end.
+
+### Gateway env variables
+
+- `MAVERICK_GWMP_BIND` (default `0.0.0.0:17000`)
+- `MAVERICK_GWMP_INGEST_TIMEOUT_MS` (for one-shot mode)
+- `MAVERICK_GWMP_LOOP_READ_TIMEOUT_MS` (supervised loop read timeout)
+- `MAVERICK_GWMP_LOOP_MAX_MESSAGES` (upper bound per run)
 
 ## Degradation signals
 

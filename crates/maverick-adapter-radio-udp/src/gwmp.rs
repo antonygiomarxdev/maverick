@@ -190,4 +190,24 @@ mod tests {
         assert!(batch.observations[0].f_cnt > 0);
         assert!(batch.observations[0].f_port > 0);
     }
+
+    #[test]
+    fn malformed_json_returns_invalid_input() {
+        let gw = GatewayEui(Eui64([9; 8]));
+        let err = parse_push_data_json(gw, 2, "{not-json").expect_err("must fail");
+        assert!(matches!(err, AppError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn parses_burst_multiple_rxpk_entries() {
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = r#"{
+          "rxpk":[
+            {"freq":868.1,"rssi":-57,"lsnr":5.2,"data":"QAECAwQEAAEByv66vg=="},
+            {"freq":868.3,"rssi":-60,"lsnr":4.8,"data":"QAECAwQEAAEByv66vg=="}
+          ]
+        }"#;
+        let batch = parse_push_data_json(gw, 2, body).expect("batch");
+        assert_eq!(batch.observations.len(), 2);
+    }
 }

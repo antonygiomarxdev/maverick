@@ -44,6 +44,8 @@ cargo run -p maverick-runtime-edge --bin maverick-edge -- storage-pressure
 cargo run -p maverick-runtime-edge --bin maverick-edge -- radio downlink-probe --host 127.0.0.1 --port 17000
 # One-shot GWMP ingest path through core use case (waits for one UDP packet)
 cargo run -p maverick-runtime-edge --bin maverick-edge -- radio ingest-once --bind 0.0.0.0:17000 --timeout-ms 5000
+# Supervised gateway loop (bounded by max-messages, continues on recoverable failures)
+cargo run -p maverick-runtime-edge --bin maverick-edge -- radio ingest-loop --bind 0.0.0.0:17000 --read-timeout-ms 1000 --max-messages 1000
 ```
 
 ## License

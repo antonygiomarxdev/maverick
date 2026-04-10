@@ -27,6 +27,7 @@ pub(crate) enum EdgeJsonKey {
     Parsed,
     Ingested,
     Failed,
+    Looped,
 }
 
 impl EdgeJsonKey {
@@ -53,6 +54,7 @@ impl EdgeJsonKey {
             EdgeJsonKey::Parsed => "parsed",
             EdgeJsonKey::Ingested => "ingested",
             EdgeJsonKey::Failed => "failed",
+            EdgeJsonKey::Looped => "looped",
         }
     }
 }
@@ -196,4 +198,33 @@ pub(crate) fn radio_ingest_result(
         m.insert(key(EdgeJsonKey::Detail), json!(d));
     }
     Value::Object(m)
+}
+
+pub(crate) fn radio_ingest_loop_result(
+    bind: &str,
+    timeout_ms: u64,
+    counters: RadioIngestCounters,
+    detail: Option<String>,
+) -> Value {
+    let mut m = Map::new();
+    m.insert(key(EdgeJsonKey::ListenBind), json!(bind));
+    m.insert(key(EdgeJsonKey::TimeoutMs), json!(timeout_ms));
+    m.insert(key(EdgeJsonKey::Looped), json!(counters.looped));
+    m.insert(key(EdgeJsonKey::Received), json!(counters.received));
+    m.insert(key(EdgeJsonKey::Parsed), json!(counters.parsed));
+    m.insert(key(EdgeJsonKey::Ingested), json!(counters.ingested));
+    m.insert(key(EdgeJsonKey::Failed), json!(counters.failed));
+    if let Some(d) = detail {
+        m.insert(key(EdgeJsonKey::Detail), json!(d));
+    }
+    Value::Object(m)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct RadioIngestCounters {
+    pub looped: bool,
+    pub received: usize,
+    pub parsed: usize,
+    pub ingested: usize,
+    pub failed: usize,
 }

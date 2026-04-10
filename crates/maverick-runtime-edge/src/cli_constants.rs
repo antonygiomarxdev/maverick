@@ -25,3 +25,9 @@ pub const DEFAULT_GWMP_BIND_ADDR: &str = "0.0.0.0:17000";
 
 /// Timeout window for one-shot GWMP listen mode in CLI.
 pub const DEFAULT_GWMP_INGEST_TIMEOUT_MS: u64 = 5_000;
+
+/// Default socket read timeout for supervised ingest loop.
+pub const DEFAULT_GWMP_LOOP_READ_TIMEOUT_MS: u64 = 1_000;
+
+/// Default cap to process in one supervised run; prevents unbounded CLI sessions.
+pub const DEFAULT_GWMP_LOOP_MAX_MESSAGES: u32 = 1_000;

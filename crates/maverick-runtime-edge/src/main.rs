@@ -12,11 +12,13 @@ mod probe;
 
 use cli_constants::{
     DEFAULT_DATA_DIR, DEFAULT_GWMP_BIND_ADDR, DEFAULT_GWMP_INGEST_TIMEOUT_MS,
-    DEFAULT_RADIO_PROBE_HOST, DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
+    DEFAULT_GWMP_LOOP_MAX_MESSAGES, DEFAULT_GWMP_LOOP_READ_TIMEOUT_MS, DEFAULT_RADIO_PROBE_HOST,
+    DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
 };
 use commands::{
-    run_health, run_probe, run_radio_downlink_probe, run_radio_ingest_once, run_recent_errors,
-    run_status, run_storage_policy, run_storage_pressure,
+    run_health, run_probe, run_radio_downlink_probe, run_radio_ingest_once,
+    run_radio_ingest_supervised, run_recent_errors, run_status, run_storage_policy,
+    run_storage_pressure,
 };
 
 #[derive(Parser)]
@@ -70,8 +72,29 @@ enum RadioCmd {
     IngestOnce {
         #[arg(long, default_value = DEFAULT_GWMP_BIND_ADDR)]
         bind: String,
-        #[arg(long, default_value_t = DEFAULT_GWMP_INGEST_TIMEOUT_MS)]
+        #[arg(
+            long,
+            default_value_t = DEFAULT_GWMP_INGEST_TIMEOUT_MS,
+            env = "MAVERICK_GWMP_INGEST_TIMEOUT_MS"
+        )]
         timeout_ms: u64,
+    },
+    /// Supervised ingest loop for local gateway operation (continues on recoverable failures).
+    IngestLoop {
+        #[arg(long, default_value = DEFAULT_GWMP_BIND_ADDR, env = "MAVERICK_GWMP_BIND")]
+        bind: String,
+        #[arg(
+            long,
+            default_value_t = DEFAULT_GWMP_LOOP_READ_TIMEOUT_MS,
+            env = "MAVERICK_GWMP_LOOP_READ_TIMEOUT_MS"
+        )]
+        read_timeout_ms: u64,
+        #[arg(
+            long,
+            default_value_t = DEFAULT_GWMP_LOOP_MAX_MESSAGES,
+            env = "MAVERICK_GWMP_LOOP_MAX_MESSAGES"
+        )]
+        max_messages: u32,
     },
 }
 
@@ -111,6 +134,20 @@ async fn main() {
             RadioCmd::DownlinkProbe { host, port } => run_radio_downlink_probe(host, port).await,
             RadioCmd::IngestOnce { bind, timeout_ms } => {
                 run_radio_ingest_once(bind, timeout_ms, cli.data_dir, db_file).await
+            }
+            RadioCmd::IngestLoop {
+                bind,
+                read_timeout_ms,
+                max_messages,
+            } => {
+                run_radio_ingest_supervised(
+                    bind,
+                    read_timeout_ms,
+                    max_messages,
+                    cli.data_dir,
+                    db_file,
+                )
+                .await
             }
         },
     }
