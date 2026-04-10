@@ -23,6 +23,7 @@ crates/
   maverick-domain/              # entities & value objects (no I/O)
   maverick-core/                # use cases, ports, LoRaWAN 1.0.x Class A capability module
   maverick-runtime-edge/        # binary: maverick-edge
+  maverick-adapter-persistence-sqlite/ # Session/Uplink/Audit + storage pressure (SQLite)
   maverick-adapter-radio-udp/   # RadioTransport adapter (stub)
   maverick-extension-contracts/ # sync envelope contracts (v1.x)
   maverick-cloud-core/          # hub HubSyncIngest port
@@ -36,6 +37,9 @@ cargo build --workspace
 cargo test --workspace
 cargo run -p maverick-runtime-edge --bin maverick-edge -- health
 cargo run -p maverick-runtime-edge --bin maverick-edge -- status
+# Optional: set data directory for SQLite (default ./data, file maverick.db)
+$env:MAVERICK_DATA_DIR = ".\data"
+cargo run -p maverick-runtime-edge --bin maverick-edge -- storage-pressure
 ```
 
 ## License

@@ -82,9 +82,23 @@ impl HybridRetentionDefaults {
 impl InstallProfile {
     pub fn default_storage_policy(self) -> StoragePolicy {
         match self {
-            Self::Constrained => HybridRetentionDefaults::constrained().into_policy(true),
+            Self::Constrained => StoragePolicy {
+                circular_at_hard_limit: true,
+                elevated_use_ratio: 0.65,
+                critical_use_ratio: 0.85,
+                max_records_telemetry: 5_000,
+                max_records_operational: 20_000,
+                max_records_critical: 50_000,
+            },
             Self::Balanced => HybridRetentionDefaults::balanced().into_policy(true),
-            Self::HighCapacity => HybridRetentionDefaults::high_capacity().into_policy(false),
+            Self::HighCapacity => StoragePolicy {
+                circular_at_hard_limit: false,
+                elevated_use_ratio: 0.8,
+                critical_use_ratio: 0.92,
+                max_records_telemetry: 200_000,
+                max_records_operational: 800_000,
+                max_records_critical: 2_000_000,
+            },
         }
     }
 }
@@ -99,5 +113,12 @@ mod tests {
         assert!(!p.circular_at_hard_limit);
         let q = InstallProfile::Constrained.default_storage_policy();
         assert!(q.circular_at_hard_limit);
+    }
+
+    #[test]
+    fn constrained_has_tighter_telemetry_cap_than_balanced() {
+        let c = InstallProfile::Constrained.default_storage_policy();
+        let b = InstallProfile::Balanced.default_storage_policy();
+        assert!(c.max_records_telemetry < b.max_records_telemetry);
     }
 }

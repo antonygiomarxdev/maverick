@@ -5,6 +5,7 @@ members = [
     "crates/maverick-core",
     "crates/maverick-extension-contracts",
     "crates/maverick-adapter-radio-udp",
+    "crates/maverick-adapter-persistence-sqlite",
     "crates/maverick-runtime-edge",
     "crates/maverick-cloud-core",
     "crates/maverick-integration-tests",
@@ -22,6 +23,7 @@ maverick-domain = { path = "crates/maverick-domain", version = "0.1.0" }
 maverick-core = { path = "crates/maverick-core", version = "0.1.0" }
 maverick-extension-contracts = { path = "crates/maverick-extension-contracts", version = "0.1.0" }
 maverick-adapter-radio-udp = { path = "crates/maverick-adapter-radio-udp", version = "0.1.0" }
+maverick-adapter-persistence-sqlite = { path = "crates/maverick-adapter-persistence-sqlite", version = "0.1.0" }
 maverick-runtime-edge = { path = "crates/maverick-runtime-edge", version = "0.1.0" }
 maverick-cloud-core = { path = "crates/maverick-cloud-core", version = "0.1.0" }
 async-trait = "0.1"
@@ -33,6 +35,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
 sysinfo = "0.30"
+rusqlite = { version = "0.33", features = ["bundled"] }
 
 [profile.release]
 lto = true

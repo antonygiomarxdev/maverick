@@ -2,7 +2,16 @@
 
 use maverick_core::health::{ComponentHealth, HealthState, HealthStatus};
 use serde::Serialize;
-use sysinfo::System;
+use sysinfo::{Disks, System};
+
+const KIB: u64 = 1024;
+const MIB: u64 = 1024 * KIB;
+const GIB: u64 = 1024 * MIB;
+const MEMORY_BYTES_512_MIB: u64 = 512 * MIB;
+const MEMORY_BYTES_2_GIB: u64 = 2 * GIB;
+
+const HEALTH_COMPONENT_MEMORY_PROBE: &str = "memory_probe";
+const HEALTH_DETAIL_TOTAL_BYTES_KEY: &str = "total_bytes";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HardwareCapabilities {
@@ -24,10 +33,9 @@ impl HardwareCapabilities {
 
     /// Map coarse memory buckets to suggested install profile (operator may override).
     pub fn suggested_install_profile(&self) -> maverick_core::InstallProfile {
-        const GB: u64 = 1024 * 1024 * 1024;
-        if self.total_memory_bytes < 512 * 1024 * 1024 {
+        if self.total_memory_bytes < MEMORY_BYTES_512_MIB {
             maverick_core::InstallProfile::Constrained
-        } else if self.total_memory_bytes < 2 * GB {
+        } else if self.total_memory_bytes < MEMORY_BYTES_2_GIB {
             maverick_core::InstallProfile::Balanced
         } else {
             maverick_core::InstallProfile::HighCapacity
@@ -42,8 +50,17 @@ pub fn health_from_probe(cap: &HardwareCapabilities) -> HealthState {
         HealthStatus::Healthy
     };
     HealthState::new(vec![ComponentHealth {
-        name: "memory_probe".to_string(),
+        name: HEALTH_COMPONENT_MEMORY_PROBE.to_string(),
         status: mem_status,
-        detail: Some(format!("total_bytes={}", cap.total_memory_bytes)),
+        detail: Some(format!(
+            "{HEALTH_DETAIL_TOTAL_BYTES_KEY}={}",
+            cap.total_memory_bytes
+        )),
     }])
+}
+
+/// Best-effort total disk capacity for storage pressure ratios (first refreshed disk with non-zero total).
+pub fn total_disk_bytes_hint() -> Option<u64> {
+    let disks = Disks::new_with_refreshed_list();
+    disks.iter().map(|d| d.total_space()).find(|t| *t > 0)
 }

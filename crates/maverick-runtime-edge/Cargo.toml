@@ -12,7 +12,8 @@ path = "src/main.rs"
 [dependencies]
 maverick-core = { workspace = true }
 maverick-domain = { workspace = true }
-clap = { version = "4", features = ["derive"] }
+maverick-adapter-persistence-sqlite = { workspace = true }
+clap = { version = "4", features = ["derive", "env"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

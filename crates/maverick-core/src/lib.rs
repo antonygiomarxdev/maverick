@@ -14,4 +14,5 @@ pub use health::{ComponentHealth, HealthState, HealthStatus};
 pub use protocol::{ProtocolCapability, ProtocolContext, ProtocolDecision};
 pub use storage::{
     HybridRetentionDefaults, InstallProfile, RetentionTier, StoragePolicy, StoragePressureLevel,
+    StoragePressureSnapshot, StoragePressureSource,
 };

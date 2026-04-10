@@ -10,3 +10,8 @@ maverick-domain = { workspace = true }
 maverick-extension-contracts = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+maverick-adapter-persistence-sqlite = { workspace = true }
+rusqlite = { workspace = true }
+tempfile = "3"
