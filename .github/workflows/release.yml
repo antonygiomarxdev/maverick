@@ -95,6 +95,8 @@ jobs:
     name: Build ${{ matrix.target }}
     needs: prepare
     runs-on: ubuntu-latest
+    container:
+      image: rust:1-bookworm
     strategy:
       matrix:
         include:
