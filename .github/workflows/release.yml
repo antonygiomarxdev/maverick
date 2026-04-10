@@ -167,7 +167,8 @@ jobs:
           chmod +x dist/maverick-edge dist/maverick-edge-tui dist/install-linux.sh
           cd dist
           tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh
-          sha256sum ../${{ matrix.artifact }}.tar.gz > ../${{ matrix.artifact }}.tar.gz.sha256
+          cd ..
+          sha256sum ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
 
       - name: Verify packaged archive contents
         shell: bash

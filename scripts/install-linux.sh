@@ -269,10 +269,19 @@ echo "Installing maverick-edge ${VERSION} (${TARGET})..."
 curl -fsSL "${BASE_URL}/${ASSET}" -o "${TMP_DIR}/${ASSET}"
 curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${TMP_DIR}/${SHA_FILE}"
 
-(
-  cd "${TMP_DIR}"
-  sha256sum -c "${SHA_FILE}"
-)
+expected_hash="$(awk 'NF { print $1; exit }' "${TMP_DIR}/${SHA_FILE}")"
+if [[ -z "${expected_hash}" ]]; then
+  echo "failed to parse expected checksum from ${SHA_FILE}" >&2
+  exit 1
+fi
+
+actual_hash="$(sha256sum "${TMP_DIR}/${ASSET}" | awk '{ print $1 }')"
+if [[ "${actual_hash}" != "${expected_hash}" ]]; then
+  echo "sha256sum mismatch for ${ASSET}" >&2
+  echo "expected: ${expected_hash}" >&2
+  echo "actual:   ${actual_hash}" >&2
+  exit 1
+fi
 
 tar -xzf "${TMP_DIR}/${ASSET}" -C "${TMP_DIR}"
 chmod +x "${TMP_DIR}/maverick-edge"
