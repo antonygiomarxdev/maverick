@@ -144,9 +144,22 @@ ensure_cmd() {
 validate_binary() {
   local binary_path="$1"
   local label="$2"
+  local output
 
-  if ! "${binary_path}" --help >/dev/null 2>&1; then
+  if ! output="$("${binary_path}" --help 2>&1)"; then
     echo "installed ${label} failed the --help smoke check" >&2
+    if [[ -n "${output}" ]]; then
+      echo "runtime output:" >&2
+      echo "${output}" >&2
+    fi
+
+    if grep -Eq 'GLIBC_[0-9]|version `GLIBC|not found' <<< "${output}"; then
+      cat >&2 <<EOF
+hint: this usually means the release binary requires a newer glibc/runtime loader than the host distro.
+      verify your distro baseline (Tier 1 edge: Raspberry Pi OS Lite Bookworm / Debian 12 minimal).
+EOF
+    fi
+
     exit 1
   fi
 }
