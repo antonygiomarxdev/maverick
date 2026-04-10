@@ -6,17 +6,11 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
-### Changed
-
-- Declared **public beta** status: `0.x` releases are versioned and tagged from now on; `1.0.0` will mark intentional stable graduation (see `docs/release-policy.md` and `README.md`).
-
-- Documentation and governance hardening for open-source release readiness:
-  - added extension version-lock and compatibility policy,
-  - added per-extension READMEs,
-  - aligned release/install/runbook wording with artifact/tag behavior,
-  - replaced placeholder maintainer/security metadata.
+Nothing yet.
 
 ## [0.1.0] - 2026-04-10
+
+First **public beta** release: Linux binaries, installer, and documented release process. Version `0.1.0` matches `[workspace.package] version` in `Cargo.toml`; tag **`v0.1.0`**.
 
 ### Added
 
@@ -38,16 +32,21 @@ The format is based on Keep a Changelog.
 	- `LICENSE`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.github` templates, `CODEOWNERS`.
 - Deployment and release assets:
 	- `Dockerfile`, `docker-compose.yml`, profile env presets (`edge`, `gateway`, `server`).
-	- Installer script and profile runner script.
-	- Release workflow for multi-target binary artifacts and multi-arch container image publishing.
+	- Release workflow for multi-target Linux tarballs (with SHA256), multi-arch GHCR image, optional `workflow_dispatch`.
+- Optional terminal extension: `maverick-extension-tui` (`maverick-edge-tui`) shipped in the same release tarball as `maverick-edge`.
+- `scripts/install-linux.sh` with one-liner install (`curl ... | bash -s --`), architecture auto-detect, checksum verify, and optional TUI install when present in the archive.
+- `docs/install.md`, `docs/release-policy.md`, `docs/extensions.md`; per-extension READMEs; operator GWMP local-gateway integration test.
 - Repository hygiene/tooling:
 	- `.editorconfig`, `.gitattributes`, `rustfmt.toml`, `.clippy.toml`.
 	- `Cargo.lock` now tracked for reproducible builds.
 
 ### Changed
 
-- README rewritten to reflect current implemented capabilities, quickstart usage, deployment profiles, and roadmap.
-- CI workflow expanded with lint/test separation and dependency audit job.
+- Declared **public beta** policy: `0.x` line is the beta train; `1.0.0` marks intentional stable graduation (see `docs/release-policy.md`, `README.md`).
+- README as OSS landing page (badges, install, releases, contributing); docs index updated.
+- Open-source metadata: workspace `repository` and `authors`; SECURITY private advisories; CoC reporting path; CONTRIBUTING aligned with CI commands and issue hygiene; issue templates + `config.yml`; PR template verification commands.
+- Release/install alignment: extension version-lock docs; documented **CI** (every `main` push) vs **Release** (tag `v*` or manual dispatch); GHCR `latest` only for stable tags (no prerelease suffix in tag name).
+- Install UX: explicit error when no GitHub Release exists yet; fixed help text when the script is run via `bash -s` from a pipe.
 
 ### Fixed
 
