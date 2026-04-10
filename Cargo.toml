@@ -4,6 +4,7 @@ members = [
     "crates/maverick-domain",
     "crates/maverick-core",
     "crates/maverick-extension-contracts",
+    "crates/maverick-extension-tui",
     "crates/maverick-adapter-radio-udp",
     "crates/maverick-adapter-persistence-sqlite",
     "crates/maverick-runtime-edge",

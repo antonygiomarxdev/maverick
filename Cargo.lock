@@ -437,6 +437,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "maverick-extension-tui"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "maverick-integration-tests"
 version = "0.1.0"
 dependencies = [
