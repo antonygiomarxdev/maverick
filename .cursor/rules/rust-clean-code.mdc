@@ -1,0 +1,15 @@
+---
+description: Rust — clean code (functions, modules, errors, naming)
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Rust — clean code
+
+- **Functions**: one clear responsibility; if the name needs “and”, consider splitting. Prefer early returns over deep nesting.
+- **Modules**: smallest reasonable public API (`pub use` only where it helps); hide internals in private submodules.
+- **Errors**: explicit error types (`thiserror`, failure enums); avoid generic `String` for control flow. Do not silence failures with `unwrap`/`expect` in production code except documented invariants or tests.
+- **Naming**: follow Rust conventions (`snake_case`, `UpperCamelCase`); names should express domain intent, not only type (`retain_count` over `n`).
+- **Comments**: only where “why” is non-obvious; “what” should read from the code.
+- **Duplication**: extract when two paths share business rules; do not duplicate blocks across adapters.
+- **Tests**: names describe behavior; assertions use messages or types that fail with useful context.

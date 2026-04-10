@@ -1,0 +1,23 @@
+---
+description: Rust — avoid magic literals; use named constants, enums, and newtypes
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Rust — no magic literals
+
+- **Domain limits and protocol numbers** (frame sizes, ratios, timeouts, caps): `pub const` in a focused module per domain (`limits`, `defaults`, `lorawan`), not copy-pasted across files.
+- **Closed vocabularies** (states, telemetry sources, stable wire operation names): use an **enum** with a single place that defines representation (`Display`, `AsRef<str>`, or explicit `serde`). Do not scatter the same `&str` across layers.
+- **Identifiers and units**: **newtypes** (`struct DevEui(...)`) so sizes and parsing live in `impl`, not at every call site.
+- **SQL / columns / JSON keys**: constants or one `schema` / `keys` module in the adapter, not duplicated strings.
+- **Rule of thumb**: if a literal appears **twice** or crosses **core ↔ adapter ↔ I/O**, give it a name or a type.
+
+```rust
+// ❌ scattered
+if s.len() != 16 { ... }
+elevated_use_ratio: 0.75,
+
+// ✅ named / typed
+const EUI64_HEX_LEN: usize = 16;
+pub const ELEVATED_USE_RATIO_BALANCED: f32 = 0.75;
+```

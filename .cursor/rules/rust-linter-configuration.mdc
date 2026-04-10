@@ -1,0 +1,16 @@
+---
+description: Rust — formatter, Clippy, CI parity, and allow-attribute policy
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Rust — linter and formatter configuration
+
+- **Source of truth**
+  - **Formatting**: [`rustfmt.toml`](rustfmt.toml) at the repo root (`edition`, `max_width`, import reordering, etc.). Run `cargo fmt --all` or `cargo fmt-check` (see [`.cargo/config.toml`](.cargo/config.toml)).
+  - **Shared lint levels**: [`Cargo.toml`](Cargo.toml) `[workspace.lints.*]` (Cargo 1.74+). Every workspace crate sets `[lints] workspace = true` to inherit a small **community-style baseline** (e.g. deny `unused_must_use`, deny `dbg_macro`, warn on `todo!` / `unimplemented!`, warn `unsafe_op_in_unsafe_fn`). This is versioned like a team ESLint config—**not** `clippy::pedantic`.
+  - **Clippy + rustc warnings**: CI runs `cargo clippy --all-targets --all-features -- -D warnings` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Locally: `cargo lint` (alias in `.cargo/config.toml`).
+- **CI parity**: Before pushing, run `cargo fmt-check` and `cargo lint`; fix issues instead of widening ignores.
+- **`#[allow(...)]` / `#[expect(...)]`**: avoid blanket allows. If unavoidable, attach a **short comment** explaining why (false positive, interoperability, measured hot path). Prefer fixing the code or scoping the allow to the smallest item.
+- **Per-crate overrides**: rare; prefer workspace-wide consistency. If a crate needs an exception, document it next to the attribute and consider a follow-up issue.
+- **Editor integration**: rust-analyzer uses `rustfmt` and shows Clippy when `cargo clippy` or `check` runs with clippy as the check command; match the flags above when configuring “check on save”.
