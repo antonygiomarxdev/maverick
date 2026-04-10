@@ -15,12 +15,12 @@ This document defines how Maverick extensions are versioned, released, and valid
 
 Extensions are additive. The default operator path remains the core CLI.
 
-## Version lock policy (v1.x)
+## Version lock policy (tagged releases)
 
-Maverick uses a workspace-wide release cadence for v1.x:
+Maverick uses a **workspace-wide release cadence** for every tagged version (including the public beta `0.x` line):
 
 - A single git tag (for example `v0.1.0`) represents one coherent release across core and extensions.
-- Workspace package version in `Cargo.toml` is the source of truth.
+- Workspace package version in `Cargo.toml` is the source of truth and must match the tag (without the `v` prefix).
 - Core and extension crates in this monorepo are released and documented together.
 
 Practical rule:

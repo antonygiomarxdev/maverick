@@ -1,7 +1,7 @@
 # Maverick Roadmap (Focus Reset)
 
 Date: 2026-04-10
-Status: Active
+Status: Active — **public beta** (`0.x` SemVer tags; see [`docs/release-policy.md`](docs/release-policy.md))
 
 ## North Star
 

@@ -8,6 +8,8 @@ The format is based on Keep a Changelog.
 
 ### Changed
 
+- Declared **public beta** status: `0.x` releases are versioned and tagged from now on; `1.0.0` will mark intentional stable graduation (see `docs/release-policy.md` and `README.md`).
+
 - Documentation and governance hardening for open-source release readiness:
   - added extension version-lock and compatibility policy,
   - added per-extension READMEs,
