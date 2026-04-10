@@ -15,7 +15,9 @@ Thanks for your interest in contributing.
 
 ```bash
 cargo check
-cargo test --all
+cargo test --workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
 ## Development Rules
@@ -28,8 +30,9 @@ cargo test --all
 ## Pull Request Checklist
 
 - [ ] Code compiles with `cargo check`.
-- [ ] Tests pass with `cargo test --all`.
-- [ ] Formatting and linting pass.
+- [ ] Tests pass with `cargo test --workspace`.
+- [ ] Formatting passes with `cargo fmt --all -- --check`.
+- [ ] Linting passes with `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 - [ ] Docs updated when behavior changes.
 - [ ] PR description includes motivation and verification steps.
 
@@ -42,3 +45,21 @@ Example: `Add downlink retry transition in sqlite repository`.
 
 Do not open public issues for vulnerabilities.
 Please follow `SECURITY.md`.
+
+## Issue Hygiene
+
+- Use status labels on tracked work:
+  - `status:planned`
+  - `status:in-progress`
+  - `status:blocked`
+  - `status:done`
+- Assign a version milestone for committed scope (`v0.1.x`), or `backlog` when not committed.
+- Close duplicates with a link to the canonical issue.
+- For stale items, leave a warning comment first and close only after an explicit inactivity window.
+- Keep closure comments evidence-based (tests, docs, PR links) to preserve traceability.
+
+### Monthly triage ritual
+
+- Review open issues and milestone alignment.
+- Close completed issues with evidence links.
+- Re-label blocked/planned items based on current priorities.
