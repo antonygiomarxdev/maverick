@@ -47,6 +47,8 @@ Quick install (one command):
 curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
 ```
 
+The installer follows standard Linux bootstrap behavior: it auto-detects common package managers (`apt-get`, `dnf`, `yum`, `apk`, `pacman`, `zypper`), installs missing prerequisites when possible, and runs a post-install smoke check on the binaries.
+
 Requires a published [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases); if `curl` returns `404`, there is no release yet (use source build below or wait for `v0.x.y`). See [`docs/install.md`](docs/install.md) for a save-then-run alternative if you do not want to pipe to `bash`.
 
 ## Quick start (source build)

@@ -5,13 +5,158 @@ REPO_OWNER="antonygiomarxdev"
 REPO_NAME="maverick"
 INSTALL_DIR="/usr/local/bin"
 VERSION="latest"
+AUTO_INSTALL_DEPS=1
+PACKAGE_MANAGER=""
+
+is_root() {
+  [[ "${EUID:-$(id -u)}" -eq 0 ]]
+}
+
+run_privileged() {
+  if is_root; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    echo "this operation requires root privileges; rerun as root or install sudo" >&2
+    exit 1
+  fi
+}
+
+detect_package_manager() {
+  if [[ -n "${PACKAGE_MANAGER}" ]]; then
+    return
+  fi
+
+  local manager
+  for manager in apt-get dnf yum apk pacman zypper; do
+    if command -v "${manager}" >/dev/null 2>&1; then
+      PACKAGE_MANAGER="${manager}"
+      return
+    fi
+  done
+}
+
+install_packages() {
+  detect_package_manager
+
+  if [[ -z "${PACKAGE_MANAGER}" ]]; then
+    echo "could not find a supported package manager to install prerequisites" >&2
+    exit 1
+  fi
+
+  echo "Installing missing prerequisites with ${PACKAGE_MANAGER}: $*"
+
+  case "${PACKAGE_MANAGER}" in
+    apt-get)
+      run_privileged apt-get update -q
+      run_privileged apt-get install -y --no-install-recommends "$@"
+      ;;
+    dnf)
+      run_privileged dnf install -y "$@"
+      ;;
+    yum)
+      run_privileged yum install -y "$@"
+      ;;
+    apk)
+      run_privileged apk add --no-cache "$@"
+      ;;
+    pacman)
+      run_privileged pacman -Sy --noconfirm "$@"
+      ;;
+    zypper)
+      run_privileged zypper --non-interactive install --no-recommends "$@"
+      ;;
+    *)
+      echo "unsupported package manager: ${PACKAGE_MANAGER}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+packages_for_command() {
+  local cmd="$1"
+
+  case "${PACKAGE_MANAGER}" in
+    apt-get|dnf|yum|zypper|pacman)
+      case "${cmd}" in
+        curl)
+          printf '%s\n' curl ca-certificates
+          ;;
+        tar)
+          printf '%s\n' tar
+          ;;
+        sha256sum|install)
+          printf '%s\n' coreutils
+          ;;
+        sudo)
+          printf '%s\n' sudo
+          ;;
+      esac
+      ;;
+    apk)
+      case "${cmd}" in
+        curl)
+          printf '%s\n' curl ca-certificates
+          ;;
+        tar)
+          printf '%s\n' tar
+          ;;
+        sha256sum|install)
+          printf '%s\n' coreutils
+          ;;
+        sudo)
+          printf '%s\n' sudo
+          ;;
+      esac
+      ;;
+  esac
+}
+
+ensure_cmd() {
+  local cmd="$1"
+  if command -v "${cmd}" >/dev/null 2>&1; then
+    return
+  fi
+
+  if [[ "${AUTO_INSTALL_DEPS}" -ne 1 ]]; then
+    echo "missing required command: ${cmd}" >&2
+    exit 1
+  fi
+
+  detect_package_manager
+  local packages
+  packages="$(packages_for_command "${cmd}")"
+  if [[ -z "${packages}" ]]; then
+    echo "missing required command: ${cmd}; automatic installation is not configured for ${PACKAGE_MANAGER:-this system}" >&2
+    exit 1
+  fi
+
+  mapfile -t package_list <<< "${packages}"
+  install_packages "${package_list[@]}"
+
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "failed to install required command: ${cmd}" >&2
+    exit 1
+  fi
+}
+
+validate_binary() {
+  local binary_path="$1"
+  local label="$2"
+
+  if ! "${binary_path}" --help >/dev/null 2>&1; then
+    echo "installed ${label} failed the --help smoke check" >&2
+    exit 1
+  fi
+}
 
 usage() {
   cat <<EOF
 install-linux.sh - install maverick-edge (and maverick-edge-tui if present) on Linux
 
 Usage:
-  $0 [--version <tag|latest>] [--install-dir <path>]
+  $0 [--version <tag|latest>] [--install-dir <path>] [--no-install-deps]
 
 One-liner (download and run in a single command; requires bash):
   curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
@@ -19,6 +164,7 @@ One-liner (download and run in a single command; requires bash):
 Examples:
   $0 --version latest
   $0 --version v0.1.0 --install-dir /usr/local/bin
+  $0 --version v0.1.0 --no-install-deps
 EOF
 }
 
@@ -31,6 +177,10 @@ while [[ $# -gt 0 ]]; do
     --install-dir)
       INSTALL_DIR="${2:-}"
       shift 2
+      ;;
+    --no-install-deps)
+      AUTO_INSTALL_DEPS=0
+      shift
       ;;
     -h|--help)
       usage
@@ -48,6 +198,13 @@ if [[ "$(uname -s)" != "Linux" ]]; then
   echo "this installer supports Linux only" >&2
   exit 1
 fi
+
+detect_package_manager
+
+ensure_cmd curl
+ensure_cmd tar
+ensure_cmd sha256sum
+ensure_cmd install
 
 ARCH_RAW="$(uname -m)"
 case "${ARCH_RAW}" in
@@ -124,20 +281,28 @@ install_one() {
   local src="$1"
   local dest_name="$2"
   if [[ ! -w "${INSTALL_DIR}" ]]; then
-    sudo install -m 0755 "${src}" "${INSTALL_DIR}/${dest_name}"
+    run_privileged install -d "${INSTALL_DIR}"
+    run_privileged install -m 0755 "${src}" "${INSTALL_DIR}/${dest_name}"
   else
+    install -d "${INSTALL_DIR}"
     install -m 0755 "${src}" "${INSTALL_DIR}/${dest_name}"
   fi
 }
 
 install_one "${TMP_DIR}/maverick-edge" "maverick-edge"
+validate_binary "${INSTALL_DIR}/maverick-edge" "maverick-edge"
 
 if [[ -f "${TMP_DIR}/maverick-edge-tui" ]]; then
   chmod +x "${TMP_DIR}/maverick-edge-tui"
   install_one "${TMP_DIR}/maverick-edge-tui" "maverick-edge-tui"
+  validate_binary "${INSTALL_DIR}/maverick-edge-tui" "maverick-edge-tui"
   echo "Installed: ${INSTALL_DIR}/maverick-edge and ${INSTALL_DIR}/maverick-edge-tui"
 else
   echo "Installed: ${INSTALL_DIR}/maverick-edge (no maverick-edge-tui in this tarball)"
+fi
+
+if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
+  echo "Note: ${INSTALL_DIR} is not currently in PATH. Add it to your shell profile before using maverick-edge directly."
 fi
 
 echo "Run smoke checks:"

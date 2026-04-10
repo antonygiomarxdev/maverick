@@ -17,11 +17,83 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VERSION_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version_tag || github.ref_name }}
 
 jobs:
+  prepare:
+    name: Prepare release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version_tag: ${{ steps.meta.outputs.version_tag }}
+      workspace_version: ${{ steps.meta.outputs.workspace_version }}
+      minor_tag: ${{ steps.meta.outputs.minor_tag }}
+      publish_latest: ${{ steps.meta.outputs.publish_latest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+
+      - name: Validate release tag against workspace version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --force --tags origin
+
+          workspace_version="$({
+            awk '
+              /^\[workspace\.package\]$/ { in_section=1; next }
+              /^\[/ { in_section=0 }
+              in_section && /^version = / {
+                gsub(/\"/, "", $3)
+                print $3
+                exit
+              }
+            ' Cargo.toml
+          })"
+
+          if [[ -z "${workspace_version}" ]]; then
+            echo "failed to resolve [workspace.package] version from Cargo.toml" >&2
+            exit 1
+          fi
+
+          expected_tag="v${workspace_version}"
+          if [[ "${VERSION_TAG}" != "${expected_tag}" ]]; then
+            echo "release tag ${VERSION_TAG} does not match Cargo.toml workspace version ${workspace_version}" >&2
+            exit 1
+          fi
+
+          tag_ref="refs/tags/${VERSION_TAG}"
+          if git show-ref --verify --quiet "${tag_ref}"; then
+            tag_commit="$(git rev-list -n 1 "${VERSION_TAG}")"
+            current_commit="$(git rev-parse HEAD)"
+            if [[ "${tag_commit}" != "${current_commit}" ]]; then
+              echo "existing tag ${VERSION_TAG} points to ${tag_commit}, but this workflow is running on ${current_commit}" >&2
+              echo "delete and recreate the tag on the intended commit, or bump the workspace version and publish a new tag" >&2
+              exit 1
+            fi
+          fi
+
+          base_version="${workspace_version%%-*}"
+          major="${base_version%%.*}"
+          minor_tag="$(printf '%s' "${base_version}" | cut -d. -f1,2)"
+          publish_latest=false
+          if [[ "${workspace_version}" == "${base_version}" ]] && [[ "${major}" =~ ^[0-9]+$ ]] && (( major >= 1 )); then
+            publish_latest=true
+          fi
+
+          {
+            echo "version_tag=${VERSION_TAG}"
+            echo "workspace_version=${workspace_version}"
+            echo "minor_tag=${minor_tag}"
+            echo "publish_latest=${publish_latest}"
+          } >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.target }}
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,8 +155,8 @@ jobs:
 
       - name: Build release binary
         run: |
-          cargo build --release --target ${{ matrix.target }} -p maverick-runtime-edge
-          cargo build --release --target ${{ matrix.target }} -p maverick-extension-tui
+          cargo build --locked --release --target ${{ matrix.target }} -p maverick-runtime-edge
+          cargo build --locked --release --target ${{ matrix.target }} -p maverick-extension-tui
 
       - name: Package binary
         run: |
@@ -97,6 +169,14 @@ jobs:
           tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh
           sha256sum ../${{ matrix.artifact }}.tar.gz > ../${{ matrix.artifact }}.tar.gz.sha256
 
+      - name: Verify packaged archive contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="${{ matrix.artifact }}.tar.gz"
+          tar -tzf "${archive}" | sort > archive.txt
+          diff -u <(printf '%s\n' install-linux.sh maverick-edge maverick-edge-tui | sort) archive.txt
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +187,7 @@ jobs:
 
   publish-github-release:
     name: GitHub Release
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,7 +202,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION_TAG }}
+          tag_name: ${{ needs.prepare.outputs.version_tag }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
@@ -131,7 +211,7 @@ jobs:
 
   publish-docker:
     name: Docker Image
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -157,8 +237,9 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=${{ env.VERSION_TAG }}
-            type=raw,value=latest,enable=${{ !contains(env.VERSION_TAG, '-') }}
+            type=raw,value=${{ needs.prepare.outputs.version_tag }}
+            type=raw,value=${{ needs.prepare.outputs.minor_tag }}
+            type=raw,value=latest,enable=${{ needs.prepare.outputs.publish_latest == 'true' }}
 
       - name: Build and push
         uses: docker/build-push-action@v5

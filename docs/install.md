@@ -11,6 +11,24 @@ This is the canonical installation path for v1 local gateway operation.
 - Release tag format: `vX.Y.Z`
 - Version rule (v1.x): keep `maverick-edge` and `maverick-edge-tui` on the same tag.
 
+## Distro support policy (public baseline)
+
+Maverick uses support tiers so operators know what is release-gated versus best-effort.
+
+- Tier 1 (release-gated for edge):
+  - Raspberry Pi OS Lite (Bookworm, 64-bit) for `aarch64-unknown-linux-gnu`
+  - Debian 12 minimal for `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, and `armv7-unknown-linux-gnueabihf`
+- Tier 2 (best-effort for edge):
+  - Ubuntu Server LTS (22.04/24.04) with matching architecture artifacts
+  - Other glibc-based distros where required base tools exist
+- Not currently supported for native binaries:
+  - musl-only distributions (for example Alpine base images) unless explicitly documented in a future release
+
+Cloud baseline (future, post-v1 runtime focus):
+
+- Candidate Tier 1 cloud distros: Debian 12 LTS and Ubuntu 24.04 LTS on `x86_64`/`arm64`.
+- Cloud support becomes Tier 1 only after cloud runtime paths have dedicated CI/test gates.
+
 ## Choose your architecture
 
 Release assets are published per Linux target:
@@ -35,6 +53,12 @@ Prerequisite: **at least one [GitHub Release](https://github.com/antonygiomarxde
 curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
 ```
 
+The installer uses standard Linux DX conventions:
+
+- detects common package managers (`apt-get`, `dnf`, `yum`, `apk`, `pacman`, `zypper`),
+- installs missing prerequisites when possible (`tar`, `coreutils`, `ca-certificates`, and similar base tools),
+- validates installed binaries with a `--help` smoke check before exiting.
+
 `bash -s --` passes arguments to the script read from stdin. Use `sudo` only if you need elevation for the whole pipeline (for example `sudo` in front of `bash` when installing to `/usr/local/bin` as a non-root user).
 
 **Alternative: save then run** (if you prefer not to pipe to `bash`):
@@ -43,6 +67,12 @@ curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scr
 curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" -o /tmp/install-maverick.sh
 chmod +x /tmp/install-maverick.sh
 /tmp/install-maverick.sh --version latest --install-dir /usr/local/bin
+```
+
+Disable automatic prerequisite installation only if you want a stricter/manual environment:
+
+```bash
+/tmp/install-maverick.sh --version v0.1.0 --install-dir /usr/local/bin --no-install-deps
 ```
 
 If `--version latest` fails with a `404` from `curl`, there is no `latest` release yet. Use **Manual install** with an explicit `VERSION="vX.Y.Z"` after the first release is published, or build from source (repository `README.md`).
@@ -112,13 +142,14 @@ docker run --rm -it \
 
 Docker tag notes:
 
-- `ghcr.io/antonygiomarxdev/maverick:latest` points to the latest tagged stable release.
+- `ghcr.io/antonygiomarxdev/maverick:latest` points to the latest tagged stable `1.x+` release.
 - For deterministic deployments, prefer explicit version tags.
 
 ## Troubleshooting
 
 - `curl: (22) ... 404` during `--version latest`: no published GitHub Release yet, or GitHub API rate limit (unauthenticated). Open the [releases page](https://github.com/antonygiomarxdev/maverick/releases); if empty, wait for the first release or build from source.
 - `curl: (22) ... 404` when downloading the `.tar.gz`: wrong or unpublished `VERSION`, or asset name mismatch for your architecture.
+- `missing required command: ...`: rerun without `--no-install-deps` so the installer can bootstrap the missing prerequisite, or install it manually with your distro package manager.
 - `command not found`: ensure `/usr/local/bin` is in `PATH`.
 - `sha256sum mismatch`: re-download both asset and checksum; do not install.
 - `permission denied` on bind: use non-privileged UDP port or run with proper capabilities.

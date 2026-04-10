@@ -23,6 +23,8 @@ Pushing commits to `main` without a tag **does not** build release tarballs or c
    - `git push origin v0.1.0`
 2. **Manual run:** GitHub → **Actions** → **Release** → **Run workflow**, set **version tag** to `v0.1.0`, run on `main` (or the branch you intend to ship).
 
+The workflow validates that the requested tag matches `[workspace.package] version` in `Cargo.toml`; mismatched manual tags fail before publishing assets.
+
 Then open **Actions** and confirm the **Release** workflow is green; after that, **Releases** should list assets and `/releases/latest` will work for the installer.
 
 ## Project phase: public beta
@@ -55,13 +57,21 @@ For each release tag:
 - SHA256 checksum file for each tarball.
 - GHCR container image tags.
 
+## Platform support tiers
+
+Release quality is tied to distro tiers:
+
+- Tier 1 edge (must pass before tagging): Raspberry Pi OS Lite Bookworm (aarch64) and Debian 12 minimal (x86_64/aarch64/armv7).
+- Tier 2 edge (best-effort): Ubuntu LTS and other glibc-based Linux distros.
+- Cloud distro tiers are advisory until cloud runtime paths are part of required release gates.
+
 ## Docker tag policy
 
 Published tags:
 
 - `ghcr.io/antonygiomarxdev/maverick:vX.Y.Z`
 - `ghcr.io/antonygiomarxdev/maverick:X.Y`
-- `ghcr.io/antonygiomarxdev/maverick:latest` only for stable tags (no prerelease suffix).
+- `ghcr.io/antonygiomarxdev/maverick:latest` only for stable tags on the `1.x+` line (no prerelease suffix).
 
 If a tag contains a prerelease suffix (for example `v0.2.0-rc.1`), `latest` must not move.
 
@@ -84,6 +94,7 @@ Before creating a tag:
 6. Move relevant entries from `Unreleased` in `CHANGELOG.md` into the target version section.
 7. Verify install docs and runbook changes when operator behavior changed.
 8. **Cross targets (aarch64 / armv7):** run the Docker smoke build so `libsqlite3-sys` does not surprise you on GitHub runners (see below).
+9. Run at least one installer smoke test on a Tier 1 edge distro image (or equivalent local container VM) using a packaged tarball.
 
 ## Validate release cross-target builds locally
 

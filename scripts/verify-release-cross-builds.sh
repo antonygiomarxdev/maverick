@@ -23,11 +23,32 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  build-essential \
   pkg-config \
   gcc-aarch64-linux-gnu \
   libc6-dev-arm64-cross \
   gcc-arm-linux-gnueabihf \
   libc6-dev-armhf-cross
+
+if ! command -v cargo >/dev/null 2>&1; then
+  curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable
+fi
+
+if [[ -f "$HOME/.cargo/env" ]]; then
+  . "$HOME/.cargo/env"
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "cargo is not available after toolchain bootstrap" >&2
+  exit 1
+fi
+
+if ! command -v rustup >/dev/null 2>&1; then
+  echo "rustup is required to add cross compilation targets" >&2
+  exit 1
+fi
 
 rustup target add aarch64-unknown-linux-gnu armv7-unknown-linux-gnueabihf
 

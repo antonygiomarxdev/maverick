@@ -15,7 +15,7 @@ These files define the current official direction:
 6. `docs/runbook-edge.md`
 7. `docs/05-test-program.md`
 8. `docs/code-review-checklist.md` — PR/sprint gate (clean code, SOLID/hexagonal, no magic values).
-9. `docs/install.md` — Linux-first install path (binary-first DX).
+9. `docs/install.md` — Linux-first install path (binary-first DX) plus distro support tiers (edge now, cloud baseline later).
 10. `docs/extensions.md` — extension model, compatibility, and version-lock policy.
 11. `docs/release-policy.md` — tag/version strategy, release checklist, and package publication rules.
 12. `scripts/verify-release-cross-builds.sh` — optional Docker smoke build for aarch64/armv7 before tagging (matches Release workflow).
