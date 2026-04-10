@@ -57,20 +57,28 @@ jobs:
           esac
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }} -p maverick-runtime-edge
+        run: |
+          cargo build --release --target ${{ matrix.target }} -p maverick-runtime-edge
+          cargo build --release --target ${{ matrix.target }} -p maverick-extension-tui
 
       - name: Package binary
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/maverick-edge dist/maverick-edge
+          cp target/${{ matrix.target }}/release/maverick-edge-tui dist/maverick-edge-tui
+          cp scripts/install-linux.sh dist/install-linux.sh
+          chmod +x dist/maverick-edge dist/maverick-edge-tui dist/install-linux.sh
           cd dist
-          tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge
+          tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh
+          sha256sum ../${{ matrix.artifact }}.tar.gz > ../${{ matrix.artifact }}.tar.gz.sha256
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.tar.gz
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
 
   publish-github-release:
     name: GitHub Release
@@ -88,7 +96,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: artifacts/**/*.tar.gz
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.sha256
 
   publish-docker:
     name: Docker Image
