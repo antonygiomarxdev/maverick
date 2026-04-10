@@ -2,16 +2,20 @@
 
 ## Local visibility (no external stack)
 
-1. `maverick-edge status` — suggested install profile and memory hint.
-2. `maverick-edge health` — JSON health snapshot from local probes.
+Global: `--data-dir` or `MAVERICK_DATA_DIR` (default `data`). Local DB file: `<data-dir>/maverick.db`.
+
+1. `maverick-edge status` — suggested install profile, memory hint, and storage summary when `maverick.db` exists.
+2. `maverick-edge health` — JSON health snapshot from local probes plus `storage` component when the DB exists (pressure / open errors).
 3. `maverick-edge recent-errors` — placeholder until log tail is wired to rotating files.
 4. `maverick-edge probe` — hardware capability JSON for support.
 5. `maverick-edge storage-policy <profile>` — effective `StoragePolicy` JSON.
+6. `maverick-edge storage-pressure` — JSON `StoragePressureSnapshot` when the DB exists.
 
 ## Degradation signals
 
 - `HealthStatus::Degraded` when probes return incomplete data (e.g. zero memory).
-- Storage pressure levels map to operator action in persistence layer (future slice).
+- `HealthStatus::Degraded` for component `storage` when `StoragePressureLevel` is above `Normal` (tier fill or on-disk ratio vs optional total-disk hint).
+- `HealthStatus::Unhealthy` for `storage` if the DB file exists but cannot be opened.
 
 ## Failure handling principle
 

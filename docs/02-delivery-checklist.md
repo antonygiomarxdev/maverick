@@ -4,6 +4,10 @@ Date: 2026-04-10
 
 Use this checklist before declaring v1 complete.
 
+## Slice 2 incremental evidence
+
+See [`slice-2-evidence.md`](slice-2-evidence.md) for what was proven in the persistence/retention slice (SQLite adapter, retention caps, busy retry test, CLI storage visibility). Remaining checklist items below still apply to **full v1** unless explicitly marked done in review.
+
 ## A. Product lock
 
 - [ ] `docs/00-product-intent.md` accepted as source of truth.
