@@ -37,7 +37,9 @@ when an individual is representing the project.
 
 ## Reporting
 
-To report incidents, email: security@maverick.local
+To report incidents, contact the maintainer privately at:
+
+- https://github.com/antonygiomarxdev
 
 All reports will be reviewed and investigated promptly and fairly.
 

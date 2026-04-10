@@ -6,6 +6,16 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation and governance hardening for open-source release readiness:
+  - added extension version-lock and compatibility policy,
+  - added per-extension READMEs,
+  - aligned release/install/runbook wording with artifact/tag behavior,
+  - replaced placeholder maintainer/security metadata.
+
+## [0.1.0] - 2026-04-10
+
 ### Added
 
 - Hexagonal core structure in `maverick-core`:

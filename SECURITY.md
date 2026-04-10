@@ -8,7 +8,9 @@ At this stage, only the `main` branch is considered supported.
 
 Please do not report security vulnerabilities through public GitHub issues.
 
-Send details to: security@maverick.local
+Use GitHub Private Vulnerability Reporting:
+
+- https://github.com/antonygiomarxdev/maverick/security/advisories/new
 
 Include:
 
