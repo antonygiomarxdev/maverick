@@ -25,6 +25,8 @@ labels: bug
 - Deployment profile: <!-- edge / gateway / server -->
 - Rust version:
 - Commit SHA or version:
+- Target milestone (if known): <!-- v0.1.1 / backlog / unknown -->
+- Expected status label: <!-- status:planned / status:in-progress / status:blocked -->
 
 ## Logs
 
@@ -33,6 +35,10 @@ labels: bug
 ```
 
 ```
+
+## Verification Evidence
+
+<!-- Add links to failing test output, command logs, or docs references. -->
 
 ## Stability Impact
 

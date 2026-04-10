@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability report
+    url: https://github.com/antonygiomarxdev/maverick/security/advisories/new
+    about: Please report vulnerabilities through private advisories, not public issues.
+  - name: Project documentation
+    url: https://github.com/antonygiomarxdev/maverick/blob/main/docs/README.md
+    about: Check docs and runbook before opening a new issue.

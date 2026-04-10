@@ -28,15 +28,15 @@ Closes #<!-- issue number, or N/A -->
 
 ```bash
 cargo check
-cargo test --all
-cargo clippy -- -D warnings
+cargo test --workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
 <!-- Add any additional commands or manual steps used to verify. -->
 
 ## Checklist
 
-- [ ] ADR created or referenced if this is an architectural decision (`docs/adr/`)
+- [ ] ADR created or referenced if this is an architectural decision (location documented in PR description)
 - [ ] Tests cover the new behavior (not just the happy path)
 - [ ] Docs updated if behavior or API surface changed
 - [ ] Change is scoped to the PR's stated goal (no unrelated edits)

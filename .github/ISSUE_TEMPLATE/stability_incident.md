@@ -14,6 +14,8 @@ labels: stability, high-priority
 - Deployment profile: <!-- edge / gateway / server -->
 - Uptime before incident:
 - How resolved: <!-- manual restart / auto-recovered / still ongoing -->
+- Target milestone (if known): <!-- v0.1.1 / backlog / unknown -->
+- Expected status label: <!-- status:planned / status:in-progress / status:blocked -->
 
 ## Symptoms Observed
 
@@ -48,3 +50,7 @@ labels: stability, high-priority
 ## What Was Happening Before
 
 <!-- Any unusual load, device floods, network issues, or configuration changes? -->
+
+## Verification Evidence
+
+<!-- Add links to logs, test reproductions, and runbook/docs updates used to validate closure. -->

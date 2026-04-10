@@ -32,3 +32,12 @@ labels: enhancement
 ## Additional Context
 
 <!-- Constraints, risks, related ADRs or docs. -->
+
+## Planning Metadata
+
+- Target milestone (if known): <!-- v0.1.1 / backlog / unknown -->
+- Expected status label: <!-- status:planned / status:in-progress / status:blocked -->
+
+## Verification Evidence (when implemented)
+
+<!-- Add links to PR, tests, docs updates, and rollout notes when this issue is closed. -->
