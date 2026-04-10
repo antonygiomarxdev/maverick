@@ -29,7 +29,15 @@ uname -m
 
 Prerequisite: **at least one [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases)** must exist. The script downloads release assets (`maverick-<target>.tar.gz`); a green `main` branch alone is not enough until a maintainer publishes a release (usually by pushing a version tag).
 
-Use the helper script from this repo:
+**Recommended: one command** (downloads and runs the installer; no separate `chmod`):
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
+```
+
+`bash -s --` passes arguments to the script read from stdin. Use `sudo` only if you need elevation for the whole pipeline (for example `sudo` in front of `bash` when installing to `/usr/local/bin` as a non-root user).
+
+**Alternative: save then run** (if you prefer not to pipe to `bash`):
 
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" -o /tmp/install-maverick.sh

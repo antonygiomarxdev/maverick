@@ -41,15 +41,13 @@ Official path is native Linux binaries from GitHub Releases.
 - Installer script: `scripts/install-linux.sh`
 - Optional extension: `maverick-edge-tui` (CLI remains default)
 
-Quick install:
+Quick install (one command):
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" -o /tmp/install-maverick.sh
-chmod +x /tmp/install-maverick.sh
-/tmp/install-maverick.sh --version latest --install-dir /usr/local/bin
+curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
 ```
 
-Requires a published [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases); if `curl` returns `404`, there is no release yet (use source build below or wait for `v0.x.y`).
+Requires a published [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases); if `curl` returns `404`, there is no release yet (use source build below or wait for `v0.x.y`). See [`docs/install.md`](docs/install.md) for a save-then-run alternative if you do not want to pipe to `bash`.
 
 ## Quick start (source build)
 

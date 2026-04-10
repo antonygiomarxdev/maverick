@@ -8,10 +8,13 @@ VERSION="latest"
 
 usage() {
   cat <<EOF
-install-linux.sh - install maverick-edge on Linux
+install-linux.sh - install maverick-edge (and maverick-edge-tui if present) on Linux
 
 Usage:
   $0 [--version <tag|latest>] [--install-dir <path>]
+
+One-liner (download and run in a single command; requires bash):
+  curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
 
 Examples:
   $0 --version latest
