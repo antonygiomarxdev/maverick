@@ -1,5 +1,9 @@
-pub mod entities;
-pub mod types;
+//! Domain layer: entities and value objects only. No framework or I/O.
 
-pub use entities::*;
-pub use types::*;
+pub mod identifiers;
+pub mod region;
+pub mod session;
+
+pub use identifiers::{DevAddr, DevEui, GatewayEui};
+pub use region::RegionId;
+pub use session::{DeviceClass, LoRaWANVersion, SessionSnapshot};

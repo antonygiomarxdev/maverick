@@ -1,0 +1,12 @@
+[package]
+name = "maverick-integration-tests"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+maverick-core = { workspace = true }
+maverick-domain = { workspace = true }
+maverick-extension-contracts = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+serde_json = { workspace = true }

@@ -1,0 +1,10 @@
+[package]
+name = "maverick-extension-contracts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Stable extension and sync envelope contracts (v1.x forward-compatible)"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

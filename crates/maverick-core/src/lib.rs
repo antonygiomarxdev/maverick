@@ -1,14 +1,17 @@
-pub mod adapters;
-pub mod api;
-pub mod config;
-pub mod db;
+//! Application kernel: use cases, ports (`traits`), protocol capability modules, storage policy.
+//!
+//! Must not depend on HTTP, concrete DB, or socket crates.
+
 pub mod error;
-pub mod events;
-pub mod host;
-pub mod ingester;
-pub mod kernel;
+pub mod health;
 pub mod ports;
-pub mod storage_profile;
+pub mod protocol;
+pub mod storage;
 pub mod use_cases;
 
-pub use error::{AppError, DomainError, Result};
+pub use error::AppError;
+pub use health::{ComponentHealth, HealthState, HealthStatus};
+pub use protocol::{ProtocolCapability, ProtocolContext, ProtocolDecision};
+pub use storage::{
+    HybridRetentionDefaults, InstallProfile, RetentionTier, StoragePolicy, StoragePressureLevel,
+};

@@ -2,12 +2,13 @@
 name = "maverick-domain"
 version.workspace = true
 edition.workspace = true
-authors.workspace = true
 license.workspace = true
-repository.workspace = true
+description = "Maverick domain types and value objects (no I/O)"
 
 [dependencies]
-serde.workspace = true
+serde = { workspace = true, optional = true }
+thiserror = { workspace = true }
 
-[lints.rust]
-unsafe-code = "forbid"
+[features]
+default = ["serde"]
+serde = ["dep:serde"]

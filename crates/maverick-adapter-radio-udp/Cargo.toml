@@ -1,0 +1,13 @@
+[package]
+name = "maverick-adapter-radio-udp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "UDP radio transport adapter (Semtech-style path to be implemented)"
+
+[lib]
+test = false
+
+[dependencies]
+maverick-core = { workspace = true }
+async-trait = { workspace = true }

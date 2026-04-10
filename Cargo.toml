@@ -1,9 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/maverick-core",
     "crates/maverick-domain",
-    "crates/maverick-crypto",
+    "crates/maverick-core",
+    "crates/maverick-extension-contracts",
+    "crates/maverick-adapter-radio-udp",
+    "crates/maverick-runtime-edge",
+    "crates/maverick-cloud-core",
+    "crates/maverick-integration-tests",
 ]
 
 [workspace.package]
@@ -15,20 +19,19 @@ repository = "https://github.com/example/maverick-core"
 
 [workspace.dependencies]
 maverick-domain = { path = "crates/maverick-domain", version = "0.1.0" }
-maverick-crypto = { path = "crates/maverick-crypto", version = "0.1.0" }
+maverick-core = { path = "crates/maverick-core", version = "0.1.0" }
+maverick-extension-contracts = { path = "crates/maverick-extension-contracts", version = "0.1.0" }
+maverick-adapter-radio-udp = { path = "crates/maverick-adapter-radio-udp", version = "0.1.0" }
+maverick-runtime-edge = { path = "crates/maverick-runtime-edge", version = "0.1.0" }
+maverick-cloud-core = { path = "crates/maverick-cloud-core", version = "0.1.0" }
 async-trait = "0.1"
-axum = { version = "0.7", features = ["macros", "json"] }
+clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-rusqlite = { version = "0.33", features = ["bundled"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["trace", "cors"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
-anyhow = "1"
-base64 = "0.22"
 sysinfo = "0.30"
 
 [profile.release]

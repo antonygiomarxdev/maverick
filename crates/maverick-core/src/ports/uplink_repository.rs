@@ -1,23 +1,17 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
-use maverick_domain::UplinkFrame;
+use maverick_domain::DevAddr;
 
-use crate::error::Result;
+use crate::error::AppResult;
 
-#[async_trait]
-pub trait UplinkRepository: Send + Sync {
-    async fn append(&self, uplink: UplinkFrame) -> Result<()>;
-    async fn append_batch(&self, uplinks: Vec<UplinkFrame>) -> Result<()>;
+/// Persisted uplink record (minimal for v1 skeleton).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UplinkRecord {
+    pub dev_addr: DevAddr,
+    pub f_cnt: u32,
+    pub payload: Vec<u8>,
 }
 
 #[async_trait]
-impl UplinkRepository for Arc<dyn UplinkRepository + Send + Sync> {
-    async fn append(&self, uplink: UplinkFrame) -> Result<()> {
-        (**self).append(uplink).await
-    }
-
-    async fn append_batch(&self, uplinks: Vec<UplinkFrame>) -> Result<()> {
-        (**self).append_batch(uplinks).await
-    }
+pub trait UplinkRepository: Send + Sync {
+    async fn append(&self, record: &UplinkRecord) -> AppResult<()>;
 }

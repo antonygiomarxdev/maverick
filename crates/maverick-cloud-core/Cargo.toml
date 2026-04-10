@@ -1,0 +1,14 @@
+[package]
+name = "maverick-cloud-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Maverick cloud/hub kernel contracts (sync ingestion, no edge coupling)"
+
+[lib]
+test = false
+
+[dependencies]
+maverick-extension-contracts = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
