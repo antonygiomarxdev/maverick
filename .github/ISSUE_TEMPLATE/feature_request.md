@@ -6,16 +6,29 @@ labels: enhancement
 
 ## Problem
 
-What user or operational problem are we trying to solve?
+<!-- What user or operational problem does this solve? Be specific about deployment context. -->
+
+## Roadmap Alignment
+
+<!-- Does this fit an existing phase? -->
+- [ ] Q2 — Stability foundation
+- [ ] Q3 — Sync MVP
+- [ ] Q4 — Production hardening
+- [ ] Future / v1.1+
+- [ ] Not on roadmap (explain why it should be)
+
+## North Star Filter
+
+<!-- Check all that apply to justify inclusion: -->
+- [ ] Required for offline operation?
+- [ ] Affects RPi 3 (1 GB RAM, ARM) deployments?
+- [ ] Lives inside the kernel boundary (protocol/persistence)?
+- [ ] Would an operator in a remote field deployment need this?
 
 ## Proposed Solution
 
-Describe your proposal.
-
 ## Alternatives Considered
-
-What alternatives were evaluated?
 
 ## Additional Context
 
-Any constraints, risks, or related links.
+<!-- Constraints, risks, related ADRs or docs. -->
