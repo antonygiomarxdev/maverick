@@ -31,7 +31,15 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Decrypted uplink payload is persisted to SQLite alongside raw frame data
   5. Region inference correctly identifies AU915 and AS923 without being shadowed by US915; UDP bind address defaults to 127.0.0.1
   6. A duplicate uplink frame (same DevAddr + FCnt arriving twice within the dedup window) is discarded — only one copy persisted to SQLite
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 01-A-PLAN.md — Domain model + schema foundations (SessionSnapshot keys, UplinkObservation wire_mic/u16 f_cnt, schema migration, UplinkRecord decrypted payload)
+- [ ] 01-B-PLAN.md — FCnt 32-bit extension + region inference fix (extend_fcnt, MAX_FCNT_GAP, infer_region AU915/AS923 arm ordering, GWMP parser wire_mic)
+- [ ] 01-C-PLAN.md — MIC verification + AppSKey decryption (IngestUplink execute pipeline, aes 0.9 + cmac 0.8)
+- [ ] 01-D-PLAN.md — SQLite dedup (is_duplicate port method, UplinkRepository impl, execute dedup check)
+- [ ] 01-E-PLAN.md — Reliability fixes (.expect() audit in lns_ops.rs, SqlitePersistence::close(), process::exit cleanup)
+- [ ] 01-F-PLAN.md — UDP bind default + CORE-01 audit (127.0.0.1:17000, zero external HTTP/DNS verification)
 
 ### Phase 2: Radio Abstraction & SPI
 **Goal**: The ingest loop is radio-agnostic and Maverick can read frames directly from an SX1302/SX1303 concentrator via SPI — no external packet forwarder required
@@ -87,7 +95,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol Correctness | 0/TBD | Not started | - |
+| 1. Protocol Correctness | 0/6 | Not started | - |
 | 2. Radio Abstraction & SPI | 0/TBD | Not started | - |
 | 3. Class A Downlink | 0/TBD | Not started | - |
 | 4. Process Supervision | 0/TBD | Not started | - |

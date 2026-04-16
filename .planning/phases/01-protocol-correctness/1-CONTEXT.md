@@ -23,7 +23,7 @@ Requirements in scope: CORE-01, CORE-02, PROT-01, PROT-02, PROT-03, PROT-04, PRO
 
 ### MIC Verification Placement
 - **D-04:** MIC verification happens in `IngestUplink::execute` after `session.get_by_dev_addr` — not inside `ProtocolCapability::validate_uplink`. The protocol module is stateless; keys come from session state.
-- **D-05:** MIC computation uses RustCrypto `aes 0.8.x` + `cmac 0.7.x`. AES-128 CMAC over the LoRaWAN B0 block (standard 1.0.x MIC construction). Frames with invalid MIC are rejected with `AppError::Domain("mic_invalid")` and audited.
+- **D-05:** MIC computation uses RustCrypto `aes 0.9` + `cmac 0.8` (NOT 0.8.x/0.7.x — API changed; verified by researcher 2026-04-16). AES-128 CMAC over the LoRaWAN B0 block (standard 1.0.x MIC construction). Frames with invalid MIC are rejected with `AppError::Domain("mic_invalid")` and audited.
 - **D-06:** MIC requires full 32-bit FCnt in the B0 block. Therefore FCnt 32-bit reconstruction (D-08) must happen BEFORE MIC verification in the execution order.
 
 ### FCnt 32-bit Reconstruction
