@@ -22,7 +22,11 @@ pub struct GwmpUdpUplinkSource {
 
 impl GwmpUdpUplinkSource {
     /// Construct from an already-bound socket (composition root may bind earlier for diagnostics).
-    pub fn new(socket: Arc<tokio::net::UdpSocket>, read_timeout: Duration, recv_buffer_len: usize) -> Self {
+    pub fn new(
+        socket: Arc<tokio::net::UdpSocket>,
+        read_timeout: Duration,
+        recv_buffer_len: usize,
+    ) -> Self {
         Self {
             socket,
             read_timeout,

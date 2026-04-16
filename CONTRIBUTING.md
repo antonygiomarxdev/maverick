@@ -22,10 +22,16 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 ## Development Rules
 
+- **`maverick-extension-tui` (Maverick console)** is an **operator-facing composition root**: it shells out to `maverick-edge`, reads onboarding files, and drives menus. It is **not** part of the ingestion hexagon (`maverick-core` ports + adapters). Keep domain rules and persistence behind `maverick-core` / `maverick-edge`; keep the console thin and modular (see [`crates/maverick-extension-tui/README.md`](crates/maverick-extension-tui/README.md)).
 - Preserve hexagonal boundaries: use cases depend on ports, not adapters.
 - Keep naming in English and consistent.
 - Add tests for all behavior changes.
 - Avoid unrelated refactors in feature PRs.
+
+## Hardware / gateway compatibility reports
+
+- Canonical policy: [`docs/compatibility-matrix.md`](docs/compatibility-matrix.md) (**tested** vs **theoretical** vs **not supported**).
+- To promote a board or radio path to **tested**, include reproducible evidence (template in that doc) and, when possible, output from `scripts/e2e-rakpi-prepush.sh` on the target device.
 
 ## Pull Request Checklist
 

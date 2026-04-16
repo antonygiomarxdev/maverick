@@ -4,6 +4,7 @@
 
 pub mod error;
 pub mod health;
+pub mod lns_config;
 pub mod ports;
 pub mod protocol;
 pub mod storage;

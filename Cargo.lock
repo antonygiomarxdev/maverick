@@ -506,6 +506,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "maverick-adapter-radio-spi"
+version = "0.1.4"
+dependencies = [
+ "async-trait",
+ "maverick-core",
+ "tokio",
+]
+
+[[package]]
 name = "maverick-adapter-radio-udp"
 version = "0.1.4"
 dependencies = [
@@ -591,6 +600,7 @@ version = "0.1.4"
 dependencies = [
  "clap",
  "maverick-adapter-persistence-sqlite",
+ "maverick-adapter-radio-spi",
  "maverick-adapter-radio-udp",
  "maverick-core",
  "maverick-domain",

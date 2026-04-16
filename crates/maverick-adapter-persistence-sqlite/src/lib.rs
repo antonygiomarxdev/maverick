@@ -10,4 +10,7 @@ mod persistence;
 pub mod schema;
 mod sqlite_op;
 
-pub use persistence::{SqlitePersistence, SqlitePersistenceOptions};
+pub use persistence::{
+    LnsApplicationRow, LnsAutoprovisionMeta, LnsDeviceListRow, LnsPendingRow, SqlitePersistence,
+    SqlitePersistenceOptions,
+};

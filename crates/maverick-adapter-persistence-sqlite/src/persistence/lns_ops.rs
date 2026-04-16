@@ -403,8 +403,9 @@ fn apply_lns_config_inner(
         }
         let dev_addr_u = match d.activation_mode {
             ActivationMode::Abp => {
-                let addr_str = d.dev_addr.as_ref()
-                    .ok_or_else(|| rusqlite::Error::InvalidParameterName("abp dev_addr missing".to_string()))?;
+                let addr_str = d.dev_addr.as_ref().ok_or_else(|| {
+                    rusqlite::Error::InvalidParameterName("abp dev_addr missing".to_string())
+                })?;
                 parse_hex_dev_addr(addr_str)
                     .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?
             }
@@ -425,10 +426,12 @@ fn apply_lns_config_inner(
         let dev_addr = DevAddr(dev_addr_u);
         let dev_eui_b = parse_hex_dev_eui(&d.dev_eui)
             .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
-        let region: RegionId = d
-            .region
-            .parse()
-            .map_err(|e: maverick_domain::region::UnknownRegionError| rusqlite::Error::InvalidParameterName(e.to_string()))?;
+        let region: RegionId =
+            d.region
+                .parse()
+                .map_err(|e: maverick_domain::region::UnknownRegionError| {
+                    rusqlite::Error::InvalidParameterName(e.to_string())
+                })?;
         let sql_sel = schema::sql_select_session_by_dev_addr();
         let existing = {
             let mut stmt = tx.prepare(sql_sel.as_str())?;

@@ -10,7 +10,7 @@ This document defines how Maverick extensions are versioned, released, and valid
 ## Extension model
 
 - Core runtime binary: `maverick-edge`
-- Optional extension binaries: for example `maverick-edge-tui`
+- Optional extension binaries: **Maverick console** (public command `maverick`, technical binary `maverick-edge-tui` during beta)
 - Shared contracts crate: `maverick-extension-contracts`
 
 Extensions are additive. The default operator path remains the core CLI.
@@ -25,7 +25,17 @@ Maverick uses a **workspace-wide release cadence** for every tagged version (inc
 
 Practical rule:
 
-- `maverick-edge` and `maverick-edge-tui` should run the same release version tag in production.
+- `maverick-edge` and the console (`maverick` / `maverick-edge-tui`) should run the same release version tag in production.
+
+### Public vs technical names (beta)
+
+- **Public UX / docs:** `maverick` (console).
+- **Artifact in tarball:** `maverick-edge-tui` (stable filename); the Linux installer adds a `maverick` symlink.
+- Deprecation: invoking `maverick-edge-tui` directly may print a notice; prefer `maverick`.
+
+## Operator LNS configuration (core, not an extension)
+
+Declarative LoRaWAN Network Server–style device/application configuration lives in **`/etc/maverick/lns-config.toml`** and is synchronized into SQLite by **`maverick-edge config load`**. This is part of the core runtime contract (not an optional extension). See [`lns-config.md`](lns-config.md).
 
 ## Compatibility contract
 

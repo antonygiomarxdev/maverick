@@ -1,37 +1,50 @@
-# maverick-extension-tui
+# maverick-extension-tui (Maverick console)
 
 Optional terminal UX extension for Maverick operators.
 
 ## What it is
 
-`maverick-edge-tui` is an external extension binary that wraps common operator flows while keeping `maverick-edge` CLI as the default interface.
+- **Public command:** `maverick` (symlink to `maverick-edge-tui`, created by `scripts/install-linux.sh` when the tarball includes the console binary).
+- **Technical binary:** `maverick-edge-tui` (stable artifact name in releases during `0.x` beta).
+- Keeps **`maverick-edge`** as the default operator interface; the console adds menus, doctor flow, and guided `setup`.
+
+Invoking the binary as `maverick-edge-tui` prints a short **deprecation notice**; prefer `maverick`.
+
+## Architecture note
+
+This crate is a **secondary composition root for operators**: it orchestrates subprocess calls to `maverick-edge` and local UX. It deliberately **does not** define ingestion or persistence ports; those live in `maverick-core` and `maverick-runtime-edge`. Reuse **types and validation** from `maverick-core` (for example LNS TOML) instead of duplicating domain rules here.
 
 ## Scope
 
-- Welcome and basic configuration flow
-- Quick status and health checks
+- Interactive `setup` wizard (`maverick setup`) and non-interactive defaults
+- Status / health / doctor dashboards
+- **`[l] LoRaWAN / LNS`**: CLI shortcuts (`config show`, `validate`, `load`, lists) plus guided editors for **applications**, **devices** (**OTAA** vs **ABP**, app picker + manual id), and **autoprovision** (writes `/etc/maverick/lns-config.toml`, optional `config load`)
 - Ingest-loop launch using saved configuration
+- Loads **system onboarding** from `/etc/maverick/runtime.env` and `/etc/maverick/setup.json` when present, then overlays `~/.config/maverick/tui-config.json`
 
 ## Install
 
-The binary is shipped in Maverick Linux release tarballs together with `maverick-edge`.
+Shipped in Maverick Linux release tarballs next to `maverick-edge`. Use the [install script](../../scripts/install-linux.sh) for onboarding + symlink creation.
 
-See:
+See also:
 
-- `docs/install.md`
-- `docs/extensions.md`
+- [`docs/install.md`](../../docs/install.md)
+- [`docs/extensions.md`](../../docs/extensions.md)
+- [`docs/maverick-console-ux-spec.md`](../../docs/maverick-console-ux-spec.md)
 
 ## Versioning
 
-This extension follows workspace release tags and is version-locked with the core runtime during v1.x.
-
-Use matching versions of:
-
-- `maverick-edge`
-- `maverick-edge-tui`
+Version-locked with `maverick-edge` on the **same Git tag** for `v1.x` releases.
 
 ## Run
 
 ```bash
-maverick-edge-tui
+maverick
+maverick --help
+```
+
+Bridge from core CLI:
+
+```bash
+maverick-edge setup   # delegates to maverick console (prefers `maverick`, falls back to `maverick-edge-tui`)
 ```

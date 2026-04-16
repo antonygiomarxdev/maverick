@@ -174,7 +174,14 @@ fn parse_lorawan_payload(raw: &[u8]) -> AppResult<ParsedLorawanPhy> {
     } else {
         vec![]
     };
-    Ok((dev_addr, fcnt_u16, f_port, payload, wire_mic, phy_without_mic))
+    Ok((
+        dev_addr,
+        fcnt_u16,
+        f_port,
+        payload,
+        wire_mic,
+        phy_without_mic,
+    ))
 }
 
 fn infer_region(freq_mhz: Option<f64>) -> RegionId {
@@ -234,7 +241,8 @@ mod tests {
     fn infer_region_au915_not_shadowed_by_us915() {
         // 916.8 MHz is AU915 uplink channel 8
         let gw = GatewayEui(Eui64([1; 8]));
-        let body = r#"{"rxpk":[{"freq":916.8,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
+        let body =
+            r#"{"rxpk":[{"freq":916.8,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
         let batch = parse_push_data_json(gw, 2, body).expect("batch");
         assert_eq!(batch.observations[0].region, RegionId::Au915);
     }
@@ -243,7 +251,8 @@ mod tests {
     fn infer_region_as923_identified() {
         // 923.2 MHz is AS923 channel
         let gw = GatewayEui(Eui64([1; 8]));
-        let body = r#"{"rxpk":[{"freq":923.2,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
+        let body =
+            r#"{"rxpk":[{"freq":923.2,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
         let batch = parse_push_data_json(gw, 2, body).expect("batch");
         assert_eq!(batch.observations[0].region, RegionId::As923);
     }
@@ -252,7 +261,8 @@ mod tests {
     fn infer_region_us915_below_915() {
         // 903.9 MHz is US915 channel 7
         let gw = GatewayEui(Eui64([1; 8]));
-        let body = r#"{"rxpk":[{"freq":903.9,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
+        let body =
+            r#"{"rxpk":[{"freq":903.9,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
         let batch = parse_push_data_json(gw, 2, body).expect("batch");
         assert_eq!(batch.observations[0].region, RegionId::Us915);
     }

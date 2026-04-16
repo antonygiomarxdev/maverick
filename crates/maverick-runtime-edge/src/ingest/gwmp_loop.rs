@@ -74,15 +74,8 @@ pub(crate) async fn run_radio_ingest_once(
     let selection = match resolve_radio_ingest(lns_path, bind.clone()) {
         Ok(s) => s,
         Err(e) => {
-            let out = edge_json::radio_ingest_result(
-                bind.as_str(),
-                timeout_ms,
-                0,
-                0,
-                0,
-                1,
-                Some(e),
-            );
+            let out =
+                edge_json::radio_ingest_result(bind.as_str(), timeout_ms, 0, 0, 0, 1, Some(e));
             println!("{}", serde_json::to_string(&out).expect("ingest result"));
             return;
         }

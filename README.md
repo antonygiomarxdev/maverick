@@ -27,7 +27,7 @@ Core principles:
 ## Current scope (v1 baseline)
 
 - Local edge runtime binary: `maverick-edge`
-- Optional terminal extension: `maverick-edge-tui`
+- Optional terminal extension: **Maverick console** (binary `maverick-edge-tui`, public command `maverick` via symlink)
 - GWMP ingest path with supervised loop mode
 - Resilience features (timeouts, retries, backoff, circuit behavior)
 - SQLite-backed persistence and storage-pressure visibility
@@ -39,7 +39,7 @@ Official path is native Linux binaries from GitHub Releases.
 
 - Full guide: [`docs/install.md`](docs/install.md)
 - Installer script: `scripts/install-linux.sh`
-- Optional extension: `maverick-edge-tui` (CLI remains default)
+- Optional extension: Maverick console / `maverick` (CLI remains default)
 
 Quick install (one command):
 
@@ -47,7 +47,14 @@ Quick install (one command):
 curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
 ```
 
-The installer follows standard Linux bootstrap behavior: it auto-detects common package managers (`apt-get`, `dnf`, `yum`, `apk`, `pacman`, `zypper`), installs missing prerequisites when possible, and runs a post-install smoke check on the binaries.
+The installer follows standard Linux bootstrap behavior: it auto-detects common package managers (`apt-get`, `dnf`, `yum`, `apk`, `pacman`, `zypper`), installs missing prerequisites when possible, validates binaries, then runs a **first-run onboarding wizard** (unless `--skip-onboarding`).
+
+Setup behavior after install:
+
+- **Interactive TTY (default):** 4-step wizard (data dir → GWMP bind/loop policy → smoke checks → extensions). Writes `/etc/maverick/runtime.env`, `/etc/maverick/setup.json`, and syncs `~/.config/maverick/`. Creates `maverick` → `maverick-edge-tui` symlink when the console binary is present.
+- **`--non-interactive`:** same files using environment defaults (see `docs/install.md`).
+- **`--skip-onboarding`:** binaries only; no `/etc/maverick` writes.
+- Re-run console setup anytime: `maverick setup` or `maverick-edge-tui setup` (legacy name). `maverick-edge setup` delegates to the console binary.
 
 Requires a published [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases); if `curl` returns `404`, there is no release yet (use source build below or wait for `v0.x.y`). See [`docs/install.md`](docs/install.md) for a save-then-run alternative if you do not want to pipe to `bash`.
 
@@ -84,7 +91,7 @@ crates/
   maverick-domain/               # entities and value objects (no I/O)
   maverick-core/                 # use cases and ports
   maverick-runtime-edge/         # maverick-edge binary
-  maverick-extension-tui/        # optional maverick-edge-tui binary
+  maverick-extension-tui/        # optional console binary (maverick-edge-tui; public name: maverick)
   maverick-extension-contracts/  # versioned extension/sync contracts
   maverick-adapter-radio-udp/    # UDP transport + GWMP parser
   maverick-adapter-persistence-sqlite/ # sqlite persistence adapters

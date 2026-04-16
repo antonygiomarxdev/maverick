@@ -52,7 +52,11 @@ async fn operator_local_gateway_flow_ingests_and_persists_uplink() {
     // Compute valid MIC using test session's zero NwkSKey.
     // session.uplink_frame_counter = 0, so reconstructed_fcnt = u32::from(obs.f_cnt).
     let reconstructed_fcnt = u32::from(obs.f_cnt);
-    let b0 = build_b0_uplink(obs.dev_addr.0, reconstructed_fcnt, obs.phy_without_mic.len());
+    let b0 = build_b0_uplink(
+        obs.dev_addr.0,
+        reconstructed_fcnt,
+        obs.phy_without_mic.len(),
+    );
     obs.wire_mic = compute_mic(&session.nwk_s_key, &b0, &obs.phy_without_mic);
     svc.execute(obs).await.expect("ingest parsed observation");
 

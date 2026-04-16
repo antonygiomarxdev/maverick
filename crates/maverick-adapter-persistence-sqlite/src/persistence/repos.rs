@@ -109,11 +109,10 @@ impl UplinkRepository for SqlitePersistence {
                     .unwrap_or(0);
                 let cutoff_ms = now_ms - window_ms;
                 let sql = schema::sql_check_uplink_dedup();
-                let count: i64 = conn.query_row(
-                    sql.as_str(),
-                    rusqlite::params![key, fcnt, cutoff_ms],
-                    |r| r.get(0),
-                )?;
+                let count: i64 =
+                    conn.query_row(sql.as_str(), rusqlite::params![key, fcnt, cutoff_ms], |r| {
+                        r.get(0)
+                    })?;
                 Ok(count > 0)
             })
         })

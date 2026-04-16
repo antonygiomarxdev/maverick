@@ -8,6 +8,7 @@ description = "SQLite persistence adapter for Maverick edge (sessions, uplinks, 
 [dependencies]
 maverick-core = { workspace = true }
 maverick-domain = { workspace = true }
+serde = { workspace = true }
 async-trait = { workspace = true }
 rusqlite = { workspace = true }
 serde_json = { workspace = true }

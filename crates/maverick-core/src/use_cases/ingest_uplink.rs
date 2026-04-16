@@ -33,11 +33,7 @@ pub fn build_b0_uplink(dev_addr: u32, f_cnt: u32, phy_len_without_mic: usize) ->
 }
 
 /// Compute AES-128 CMAC over B0 || PHY_without_MIC, return first 4 bytes.
-pub fn compute_mic(
-    nwk_s_key: &[u8; 16],
-    b0: &[u8; 16],
-    phy_without_mic: &[u8],
-) -> [u8; 4] {
+pub fn compute_mic(nwk_s_key: &[u8; 16], b0: &[u8; 16], phy_without_mic: &[u8]) -> [u8; 4] {
     let mut mac =
         <Cmac<Aes128> as KeyInit>::new_from_slice(nwk_s_key).expect("NwkSKey is always 16 bytes");
     mac.update(b0);
@@ -48,12 +44,7 @@ pub fn compute_mic(
 
 /// LoRaWAN 1.0.x §4.3.3.2 — AES-128-CTR FRMPayload decryption.
 /// Block counter `i` starts at 1 (NOT 0) per spec §4.3.3.2.
-fn decrypt_frm_payload(
-    app_s_key: &[u8; 16],
-    dev_addr: u32,
-    f_cnt: u32,
-    payload: &[u8],
-) -> Vec<u8> {
+fn decrypt_frm_payload(app_s_key: &[u8; 16], dev_addr: u32, f_cnt: u32, payload: &[u8]) -> Vec<u8> {
     use aes::cipher::BlockCipherEncrypt;
     if payload.is_empty() {
         return Vec::new();
@@ -176,7 +167,11 @@ impl IngestUplink {
         let session = session.expect("session confirmed present before this point");
 
         // 5. MIC verification (LoRaWAN §4.4) — using reconstructed 32-bit FCnt
-        let b0 = build_b0_uplink(obs.dev_addr.0, reconstructed_fcnt, obs.phy_without_mic.len());
+        let b0 = build_b0_uplink(
+            obs.dev_addr.0,
+            reconstructed_fcnt,
+            obs.phy_without_mic.len(),
+        );
         let computed_mic = compute_mic(&session.nwk_s_key, &b0, &obs.phy_without_mic);
         if computed_mic != obs.wire_mic {
             self.audit
@@ -322,7 +317,7 @@ mod tests {
     /// Build an observation with a valid MIC for the zero NwkSKey.
     fn obs_with_valid_mic(fc: u16, session: &SessionSnapshot) -> UplinkObservation {
         let phy: Vec<u8> = vec![0xAA]; // dummy PHY body (no actual LoRaWAN framing needed for unit test)
-        // Compute what reconstructed FCnt will be (wire > session → candidate_low)
+                                       // Compute what reconstructed FCnt will be (wire > session → candidate_low)
         let reconstructed = u32::from(fc); // session.uplink_frame_counter = 0, so candidate_low = fc
         let b0 = build_b0_uplink(session.dev_addr.0, reconstructed, phy.len());
         let mic = compute_mic(&session.nwk_s_key, &b0, &phy);

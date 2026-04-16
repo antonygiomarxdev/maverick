@@ -1,6 +1,9 @@
 //! SQLite-backed persistence: composition root for retention and port implementations.
 
 mod busy;
+mod lns_ops;
+
+pub use lns_ops::{LnsApplicationRow, LnsAutoprovisionMeta, LnsDeviceListRow, LnsPendingRow};
 mod pressure;
 mod pruning;
 mod repos;
@@ -91,15 +94,11 @@ impl SqlitePersistence {
     pub fn close(self) -> AppResult<()> {
         if Arc::strong_count(&self.inner) == 1 {
             let guard = self.inner.conn.lock().map_err(|_| {
-                AppError::Infrastructure(
-                    "mutex_poisoned: cannot checkpoint on close".to_string(),
-                )
+                AppError::Infrastructure("mutex_poisoned: cannot checkpoint on close".to_string())
             })?;
             guard
                 .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
-                .map_err(|e| {
-                    AppError::Infrastructure(format!("wal_checkpoint on close: {e}"))
-                })?;
+                .map_err(|e| AppError::Infrastructure(format!("wal_checkpoint on close: {e}")))?;
         }
         Ok(())
     }

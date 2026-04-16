@@ -86,7 +86,9 @@ ON CONFLICT({DEV_ADDR}) DO UPDATE SET
 
 pub fn sql_insert_uplink() -> String {
     use names::UPLINKS;
-    use uplink_columns::{APPLICATION_ID, DEV_ADDR, F_CNT, PAYLOAD, PAYLOAD_DECRYPTED, RECEIVED_AT_MS};
+    use uplink_columns::{
+        APPLICATION_ID, DEV_ADDR, F_CNT, PAYLOAD, PAYLOAD_DECRYPTED, RECEIVED_AT_MS,
+    };
     format!(
         "INSERT INTO {UPLINKS} ({DEV_ADDR}, {F_CNT}, {RECEIVED_AT_MS}, {PAYLOAD}, {APPLICATION_ID}, {PAYLOAD_DECRYPTED}) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
