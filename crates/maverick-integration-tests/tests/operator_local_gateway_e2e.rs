@@ -5,7 +5,7 @@ use maverick_adapter_radio_udp::parse_push_data_json;
 use maverick_core::ports::SessionRepository;
 use maverick_core::protocol::LoRaWAN10xClassA;
 use maverick_core::storage::StoragePressureSource;
-use maverick_core::use_cases::IngestUplink;
+use maverick_core::use_cases::{build_b0_uplink, compute_mic, IngestUplink};
 use maverick_core::InstallProfile;
 use maverick_domain::identifiers::Eui64;
 use maverick_domain::{DevAddr, DevEui, DeviceClass, GatewayEui, RegionId, SessionSnapshot};
@@ -48,9 +48,13 @@ async fn operator_local_gateway_flow_ingests_and_persists_uplink() {
     }"#;
     let batch = parse_push_data_json(gw, 2, gwmp_json).expect("parse gwmp");
     assert_eq!(batch.observations.len(), 1);
-    svc.execute(batch.observations.into_iter().next().expect("obs"))
-        .await
-        .expect("ingest parsed observation");
+    let mut obs = batch.observations.into_iter().next().expect("obs");
+    // Compute valid MIC using test session's zero NwkSKey.
+    // session.uplink_frame_counter = 0, so reconstructed_fcnt = u32::from(obs.f_cnt).
+    let reconstructed_fcnt = u32::from(obs.f_cnt);
+    let b0 = build_b0_uplink(obs.dev_addr.0, reconstructed_fcnt, obs.phy_without_mic.len());
+    obs.wire_mic = compute_mic(&session.nwk_s_key, &b0, &obs.phy_without_mic);
+    svc.execute(obs).await.expect("ingest parsed observation");
 
     let persisted = SessionRepository::get_by_dev_addr(&store, DevAddr(0x0403_0201))
         .await

@@ -8,7 +8,7 @@ use maverick_core::lns_config::{
 use maverick_core::ports::{SessionRepository, UplinkObservation, UplinkRecord, UplinkRepository};
 use maverick_core::protocol::LoRaWAN10xClassA;
 use maverick_core::storage::StoragePressureSource;
-use maverick_core::use_cases::IngestUplink;
+use maverick_core::use_cases::{build_b0_uplink, compute_mic, IngestUplink};
 use maverick_core::InstallProfile;
 use maverick_domain::identifiers::Eui64;
 use maverick_domain::{DevAddr, DevEui, DeviceClass, GatewayEui, RegionId, SessionSnapshot};
@@ -96,6 +96,10 @@ async fn ingest_uplink_persists_via_sqlite_adapter() {
         protocol: Arc::new(LoRaWAN10xClassA),
     };
 
+    let phy: Vec<u8> = vec![0x01]; // dummy PHY body for MIC computation
+    let reconstructed_fcnt = 1u32; // session.uplink_frame_counter=0, wire f_cnt=1
+    let b0 = build_b0_uplink(0xA1_B2_C3_D4, reconstructed_fcnt, phy.len());
+    let mic = compute_mic(&session.nwk_s_key, &b0, &phy);
     let obs = UplinkObservation {
         gateway_eui: GatewayEui(Eui64([0x22; 8])),
         dev_addr: DevAddr(0xA1_B2_C3_D4),
@@ -105,8 +109,8 @@ async fn ingest_uplink_persists_via_sqlite_adapter() {
         payload: vec![0x01, 0x02],
         rssi: None,
         snr: None,
-        wire_mic: [0u8; 4],
-        phy_without_mic: vec![],
+        wire_mic: mic,
+        phy_without_mic: phy,
     };
     svc.execute(obs).await.expect("ingest");
 
