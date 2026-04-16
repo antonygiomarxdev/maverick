@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 01 complete; ready to run /gsd-plan-phase 2
+stopped_at: Phase 02 planned (02-A..02-D); ready to execute 02-A-PLAN
 last_updated: "2026-04-16"
-last_activity: 2026-04-16 -- Phase 01 all 6 plans complete, tests passing
+last_activity: 2026-04-16 -- Phase 02 executable plans added (02-A..02-D)
 progress:
   total_phases: 5
   completed_phases: 1
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** Never lose a LoRaWAN uplink — from radio to SQLite, data is preserved regardless of internet connectivity, extension state, or process restarts.
-**Current focus:** Phase 01 — Protocol Correctness
+**Current focus:** Phase 02 — Radio Abstraction & SPI
 
 ## Current Position
 
-Phase: 01 (Protocol Correctness) — COMPLETE
-Plan: 6 of 6
-Status: Phase 01 done; Phase 02 not yet planned
-Last activity: 2026-04-16 -- Phase 01 all 6 plans complete
+Phase: 02 (Radio Abstraction & SPI) — PLANNED (not executed)
+Plan: 0 of 4 executed (02-A..02-D authored)
+Status: Execute 02-A next (trait + `[radio]` config)
+Last activity: 2026-04-16 -- Phase 02 plans created
 
 Progress: [██░░░░░░░░] 20%
 
@@ -85,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-16
-Stopped at: Roadmap + STATE initialized; ready to run /gsd-plan-phase 1
+Last session: 2026-04-16 (resumed)
+Stopped at: Phase 02 plans ready — execute 02-A-PLAN (`/gsd-execute-phase` or manual wave 1)
 Resume file: None
