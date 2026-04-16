@@ -15,6 +15,7 @@ pub struct ProtocolContext<'a> {
 pub enum ProtocolDecision {
     Accept,
     RejectDuplicateFrameCounter,
+    RejectFcntGapExceeded,
     RejectNoSession,
     RejectRegionMismatch,
     RejectUnsupportedClass,
