@@ -20,8 +20,13 @@ pub const STORAGE_OPEN_FAILED_PREFIX: &str = "open failed: ";
 /// Single-byte UDP probe payload (Semtech GWMP parsing is future work).
 pub const RADIO_PROBE_PAYLOAD_BYTE: u8 = 0x01;
 
-/// Default bind address for one-shot GWMP uplink ingest.
-pub const DEFAULT_GWMP_BIND_ADDR: &str = "0.0.0.0:17000";
+/// Default bind address for GWMP uplink ingest.
+///
+/// Changed from 0.0.0.0 to 127.0.0.1 (SEC-01) — binds to loopback only.
+/// For external packet forwarders on other hosts, override with:
+///   --bind 0.0.0.0:17000
+/// or set MAVERICK_GWMP_BIND=0.0.0.0:17000 in the environment.
+pub const DEFAULT_GWMP_BIND_ADDR: &str = "127.0.0.1:17000";
 
 /// Timeout window for one-shot GWMP listen mode in CLI.
 pub const DEFAULT_GWMP_INGEST_TIMEOUT_MS: u64 = 5_000;
