@@ -21,6 +21,7 @@
 - [ ] **PROT-03**: LNS stores NwkSKey and AppSKey per session and uses them for MIC verification and payload decryption
 - [ ] **PROT-04**: LNS decrypts uplink payload with AppSKey (AES-128 CTR) and persists decrypted payload
 - [ ] **PROT-05**: Region inference correctly identifies AU915 and AS923 without shadowing by US915
+- [ ] **PROT-06**: Duplicate uplink frames (same DevAddr + FCnt within a deduplication window) are detected and discarded — only the first copy is persisted
 
 ### LoRaWAN Class A (Downlink)
 
@@ -28,6 +29,8 @@
 - [ ] **DWNL-02**: LNS falls back to RX2 window (2s after uplink end) if RX1 transmission fails
 - [ ] **DWNL-03**: LNS sends ACK flag in downlink for confirmed uplinks
 - [ ] **DWNL-04**: Downlink queue persists to SQLite (survives process restart)
+- [ ] **DWNL-05**: Downlink transmission uses precise hardware timestamp from concentrator to hit RX1/RX2 windows within LoRaWAN Class A timing tolerance
+- [ ] **DWNL-06**: LNS parses LinkCheckReq MAC command from FOpts and responds with LinkCheckAns in next downlink
 
 ### Radio Hardware (SPI Direct)
 
@@ -55,6 +58,7 @@
 - [ ] **DEV-02**: Operator can list all registered devices with status (last seen, uplink count) via TUI
 - [ ] **DEV-03**: Operator can remove a device via TUI
 - [ ] **DEV-04**: `lns-config.toml` import remains supported for bulk device provisioning
+- [ ] **DEV-05**: Operator can view autoprovision-pending devices (unknown DevAddr frames) in TUI and promote them to registered devices
 
 ---
 
@@ -105,25 +109,28 @@
 |-------------|-------|--------|
 | CORE-01 | Phase 1 | Pending |
 | CORE-02 | Phase 1 | Pending |
-| CORE-03 | Phase 1 | Pending |
+| CORE-03 | Phase 5 | Pending |
 | CORE-04 | Phase 2 | Pending |
 | PROT-01 | Phase 1 | Pending |
 | PROT-02 | Phase 1 | Pending |
 | PROT-03 | Phase 1 | Pending |
 | PROT-04 | Phase 1 | Pending |
 | PROT-05 | Phase 1 | Pending |
+| PROT-06 | Phase 1 | Pending |
 | RELI-01 | Phase 1 | Pending |
 | RELI-02 | Phase 1 | Pending |
+| RELI-05 | Phase 2 | Pending |
 | SEC-01 | Phase 1 | Pending |
 | RADIO-01 | Phase 2 | Pending |
 | RADIO-02 | Phase 2 | Pending |
 | RADIO-03 | Phase 2 | Pending |
 | RADIO-04 | Phase 2 | Pending |
-| RELI-05 | Phase 2 | Pending |
 | DWNL-01 | Phase 3 | Pending |
 | DWNL-02 | Phase 3 | Pending |
 | DWNL-03 | Phase 3 | Pending |
 | DWNL-04 | Phase 3 | Pending |
+| DWNL-05 | Phase 3 | Pending |
+| DWNL-06 | Phase 3 | Pending |
 | RELI-03 | Phase 4 | Pending |
 | RELI-04 | Phase 4 | Pending |
 | SEC-02 | Phase 4 | Pending |
@@ -131,12 +138,13 @@
 | DEV-02 | Phase 5 | Pending |
 | DEV-03 | Phase 5 | Pending |
 | DEV-04 | Phase 5 | Pending |
+| DEV-05 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 25 total
-- Mapped to phases: 21
+- v1 requirements: 29 total
+- Mapped to phases: 29
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-16*
-*Last updated: 2026-04-16 after initial definition*
+*Last updated: 2026-04-16 — traceability updated after roadmap creation*
