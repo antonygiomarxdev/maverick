@@ -55,6 +55,9 @@ impl SessionRepository for SqlitePersistence {
                         session.uplink_frame_counter as i64,
                         session.downlink_frame_counter as i64,
                         ts,
+                        session.application_id.clone(),
+                        &session.nwk_s_key[..],
+                        &session.app_s_key[..],
                     ],
                 )?;
                 p.prune_sessions_lru_sql(conn)?;
@@ -79,7 +82,10 @@ impl UplinkRepository for SqlitePersistence {
                     params![
                         record.dev_addr.0 as i64,
                         record.f_cnt as i64,
+                        record.received_at_ms,
                         &record.payload[..],
+                        record.application_id.clone(),
+                        record.payload_decrypted.as_deref(),
                     ],
                 )?;
                 p.prune_uplinks_sql(conn)?;

@@ -47,13 +47,16 @@ impl IngestUplink {
         self.uplinks
             .append(&UplinkRecord {
                 dev_addr: obs.dev_addr,
-                f_cnt: obs.f_cnt,
+                f_cnt: obs.f_cnt as u32,
+                received_at_ms: 0, // TODO(Plan-C): set to now_ms() after timestamp is threaded through
                 payload: obs.payload.clone(),
+                application_id: session.application_id.clone(),
+                payload_decrypted: None, // TODO(Plan-C): populate after decryption is wired
             })
             .await?;
 
         let mut updated = session;
-        updated.uplink_frame_counter = obs.f_cnt;
+        updated.uplink_frame_counter = obs.f_cnt as u32;
         self.sessions.upsert(&updated).await?;
 
         self.audit
@@ -116,7 +119,7 @@ mod tests {
         }
     }
 
-    fn obs(fc: u32) -> UplinkObservation {
+    fn obs(fc: u16) -> UplinkObservation {
         UplinkObservation {
             gateway_eui: GatewayEui(Eui64([9; 8])),
             dev_addr: DevAddr(0xAB_CD_00_01),
@@ -126,6 +129,8 @@ mod tests {
             payload: vec![0xAA],
             rssi: Some(-90),
             snr: Some(5.5),
+            wire_mic: [0u8; 4],
+            phy_without_mic: vec![],
         }
     }
 
@@ -138,6 +143,9 @@ mod tests {
             class: DeviceClass::ClassA,
             uplink_frame_counter: 0,
             downlink_frame_counter: 0,
+            application_id: None,
+            nwk_s_key: [0u8; 16],
+            app_s_key: [0u8; 16],
         };
         let sess_store = Arc::new(tokio::sync::Mutex::new(Some(session)));
         let uplinks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
@@ -172,6 +180,9 @@ mod tests {
             class: DeviceClass::ClassA,
             uplink_frame_counter: 5,
             downlink_frame_counter: 0,
+            application_id: None,
+            nwk_s_key: [0u8; 16],
+            app_s_key: [0u8; 16],
         };
         let sess_store = Arc::new(tokio::sync::Mutex::new(Some(session)));
         let uplinks = Arc::new(tokio::sync::Mutex::new(Vec::new()));

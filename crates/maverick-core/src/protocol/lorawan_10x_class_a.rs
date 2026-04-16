@@ -41,7 +41,9 @@ impl ProtocolCapability for LoRaWAN10xClassA {
             return Ok(ProtocolDecision::RejectRegionMismatch);
         }
         // LoRaWAN 1.0.x: uplink FCnt must be strictly greater than last seen (32-bit).
-        if obs.f_cnt <= session.uplink_frame_counter {
+        // obs.f_cnt is the 16-bit wire value; comparison against the stored 32-bit counter is
+        // intentionally truncated here — full 32-bit rollover logic lands in Plan B.
+        if (obs.f_cnt as u32) <= session.uplink_frame_counter {
             return Ok(ProtocolDecision::RejectDuplicateFrameCounter);
         }
         Ok(ProtocolDecision::Accept)
@@ -64,10 +66,13 @@ mod tests {
             class: DeviceClass::ClassA,
             uplink_frame_counter: fc,
             downlink_frame_counter: 0,
+            application_id: None,
+            nwk_s_key: [0u8; 16],
+            app_s_key: [0u8; 16],
         }
     }
 
-    fn sample_observation(fc: u32) -> UplinkObservation {
+    fn sample_observation(fc: u16) -> UplinkObservation {
         UplinkObservation {
             gateway_eui: maverick_domain::GatewayEui(Eui64([8; 8])),
             dev_addr: DevAddr(0x01_02_03_04),
@@ -77,6 +82,8 @@ mod tests {
             payload: vec![0x01],
             rssi: None,
             snr: None,
+            wire_mic: [0u8; 4],
+            phy_without_mic: vec![],
         }
     }
 
