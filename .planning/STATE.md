@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 02 planned (02-A..02-D); ready to execute 02-A-PLAN
+stopped_at: Phase 02 — 02-A/02-B/02-D executed; 02-C (SPI + libloragw) pending
 last_updated: "2026-04-16"
-last_activity: 2026-04-16 -- Phase 02 executable plans added (02-A..02-D)
+last_activity: 2026-04-16 -- Phase 02: UplinkSource + UDP refactor + hardware registry doc
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
-  percent: 20
+  total_plans: 10
+  completed_plans: 9
+  percent: 35
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 
 ## Current Position
 
-Phase: 02 (Radio Abstraction & SPI) — PLANNED (not executed)
-Plan: 0 of 4 executed (02-A..02-D authored)
-Status: Execute 02-A next (trait + `[radio]` config)
-Last activity: 2026-04-16 -- Phase 02 plans created
+Phase: 02 (Radio Abstraction & SPI) — IN PROGRESS
+Plan: 3 of 4 executed (02-C SPI adapter not started)
+Status: Implement 02-C-PLAN next (libloragw / `spi` feature)
+Last activity: 2026-04-16 -- Phase 02: 02-A, 02-B, 02-D shipped in repo
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 35% (milestone rough: Phase 1 done + Phase 2 partial)
 
 ## Performance Metrics
 
@@ -86,5 +86,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-16 (resumed)
-Stopped at: Phase 02 plans ready — execute 02-A-PLAN (`/gsd-execute-phase` or manual wave 1)
+Stopped at: Phase 02 — next up 02-C-PLAN (SPI / libloragw)
 Resume file: None

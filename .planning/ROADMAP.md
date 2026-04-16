@@ -53,10 +53,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-A-PLAN.md — `UplinkSource` port trait + optional `[radio]` in `lns-config.toml` (RELI-05, RADIO-03 schema)
-- [ ] 02-B-PLAN.md — `GwmpUdpUplinkSource` + refactor `gwmp_loop` to `next_batch()` (UDP path)
+- [x] 02-A-PLAN.md — `UplinkSource` port trait + optional `[radio]` in `lns-config.toml` (RELI-05, RADIO-03 schema)
+- [x] 02-B-PLAN.md — `GwmpUdpUplinkSource` + refactor `gwmp_loop` to `next_batch()` (UDP path)
 - [ ] 02-C-PLAN.md — `maverick-adapter-radio-spi` + libloragw / feature `spi` + runtime wiring (RADIO-01/02)
-- [ ] 02-D-PLAN.md — `hardware-registry.toml` + docs (CORE-04, RADIO-04)
+- [x] 02-D-PLAN.md — `hardware-registry.toml` + docs (CORE-04, RADIO-04)
 
 ### Phase 3: Class A Downlink
 **Goal**: Maverick can send downlinks to Class A devices through both RX windows, with confirmed-uplink ACKs, and the downlink queue survives process restarts
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol Correctness | 6/6 | Complete | 2026-04-16 |
-| 2. Radio Abstraction & SPI | 0/4 | Planned (not executed) | - |
+| 2. Radio Abstraction & SPI | 3/4 | In progress (SPI adapter pending) | - |
 | 3. Class A Downlink | 0/TBD | Not started | - |
 | 4. Process Supervision | 0/TBD | Not started | - |
 | 5. TUI Device Management | 0/TBD | Not started | - |

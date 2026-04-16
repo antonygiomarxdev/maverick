@@ -23,6 +23,7 @@ fn sqlite_apply_lns_otaa_without_dev_addr() {
     let doc = LnsConfigDocument {
         schema_version: 1,
         autoprovision: AutoprovisionPolicy::default(),
+        radio: None,
         applications: vec![ApplicationEntry {
             id: "app1".to_string(),
             name: "A".to_string(),

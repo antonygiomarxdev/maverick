@@ -128,7 +128,9 @@ fn rxpk_to_observation(gateway_eui: GatewayEui, rx: Rxpk) -> AppResult<UplinkObs
     })
 }
 
-fn parse_lorawan_payload(raw: &[u8]) -> AppResult<(DevAddr, u16, u8, Vec<u8>, [u8; 4], Vec<u8>)> {
+type ParsedLorawanPhy = (DevAddr, u16, u8, Vec<u8>, [u8; 4], Vec<u8>);
+
+fn parse_lorawan_payload(raw: &[u8]) -> AppResult<ParsedLorawanPhy> {
     if raw.len() < LORAWAN_MACPAYLOAD_MIN_LEN {
         return Err(AppError::InvalidInput(
             "lorawan payload too short".to_string(),

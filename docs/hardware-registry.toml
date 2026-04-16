@@ -1,0 +1,22 @@
+# Maverick hardware compatibility registry (community-extensible)
+#
+# This file is operator documentation — the edge runtime does not parse it in v1.
+# Add boards following the schema below; keep `status` one of: verified, untested, unsupported.
+
+schema_version = 1
+
+[[boards]]
+board_name = "RAK2287 / RAK5146 (Pi HAT)"
+status = "verified"
+arch = "aarch64"
+spi_device = "/dev/spidev0.0"
+concentrator_model = "sx1302"
+notes = "Typical Raspberry Pi + RAK LoRa HAT deployment; confirm spidev path on your OS image."
+
+[[boards]]
+board_name = "RAK2287 / RAK5146 (Pi HAT)"
+status = "verified"
+arch = "armv7"
+spi_device = "/dev/spidev0.0"
+concentrator_model = "sx1302"
+notes = "Same HAT on armv7 Pi; use 32-bit Raspberry Pi OS if applicable."
