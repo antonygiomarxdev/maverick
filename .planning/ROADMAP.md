@@ -13,7 +13,7 @@ Maverick ships in five phases that build on each other from the ground up. Phase
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Protocol Correctness** - MIC verification, 32-bit FCnt, session keys, region fix, and reliability groundwork
-- [ ] **Phase 2: Radio Abstraction & SPI** - UplinkSource port trait, direct SPI adapter, hardware registry, UDP hardening
+- [x] **Phase 2: Radio Abstraction & SPI** - UplinkSource port trait, direct SPI adapter, hardware registry, UDP hardening
 - [ ] **Phase 3: Class A Downlink** - RX1/RX2 window scheduling, ACK flag, persistent downlink queue
 - [ ] **Phase 4: Process Supervision** - systemd Restart=always, watchdog, key-at-rest protection
 - [ ] **Phase 5: TUI Device Management** - Add/list/remove devices via terminal UI backed by SQLite
