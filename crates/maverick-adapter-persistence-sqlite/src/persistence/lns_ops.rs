@@ -291,15 +291,19 @@ fn apply_lns_config_inner(
     }
     tx.execute("DELETE FROM lns_devices", [])?;
     for d in &doc.devices {
-        let dev_eui_b = parse_hex_dev_eui(&d.dev_eui).expect("validated lns config");
+        let dev_eui_b = parse_hex_dev_eui(&d.dev_eui)
+            .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
         let activation_mode_str = match d.activation_mode {
             ActivationMode::Otaa => "otaa",
             ActivationMode::Abp => "abp",
         };
         let dev_addr_sql: Option<i64> = match d.activation_mode {
             ActivationMode::Abp => {
-                let u = parse_hex_dev_addr(d.dev_addr.as_ref().expect("validated abp"))
-                    .expect("validated");
+                let addr_str = d.dev_addr.as_ref().ok_or_else(|| {
+                    rusqlite::Error::InvalidParameterName("abp dev_addr missing".to_string())
+                })?;
+                let u = parse_hex_dev_addr(addr_str)
+                    .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
                 Some(u as i64)
             }
             ActivationMode::Otaa => d.dev_addr.as_ref().and_then(|s| {
@@ -315,12 +319,18 @@ fn apply_lns_config_inner(
         type OptKey16 = Option<[u8; 16]>;
         let (join_eui, app_key, nwk_key): (OptJoin, OptKey16, OptKey16) =
             if let Some(ref k) = d.otaa {
-                let j = parse_hex_16(&k.join_eui).expect("validated lns config");
-                let ak = parse_hex_32(&k.app_key).expect("validated lns config");
+                let j = parse_hex_16(&k.join_eui)
+                    .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
+                let ak = parse_hex_32(&k.app_key)
+                    .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
                 let nk = k
                     .nwk_key
                     .as_ref()
-                    .map(|s| parse_hex_32(s).expect("validated lns config"));
+                    .map(|s| {
+                        parse_hex_32(s)
+                            .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))
+                    })
+                    .transpose()?;
                 (Some(j), Some(ak), nk)
             } else {
                 (None, None, None)
@@ -330,12 +340,20 @@ fn apply_lns_config_inner(
                 .apps_key
                 .as_ref()
                 .filter(|s| !s.trim().is_empty())
-                .map(|s| parse_hex_32(s).expect("validated"));
+                .map(|s| {
+                    parse_hex_32(s)
+                        .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))
+                })
+                .transpose()?;
             let n = abp
                 .nwks_key
                 .as_ref()
                 .filter(|s| !s.trim().is_empty())
-                .map(|s| parse_hex_32(s).expect("validated"));
+                .map(|s| {
+                    parse_hex_32(s)
+                        .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))
+                })
+                .transpose()?;
             (a, n)
         } else {
             (None, None)
@@ -385,7 +403,10 @@ fn apply_lns_config_inner(
         }
         let dev_addr_u = match d.activation_mode {
             ActivationMode::Abp => {
-                parse_hex_dev_addr(d.dev_addr.as_ref().expect("validated")).expect("validated")
+                let addr_str = d.dev_addr.as_ref()
+                    .ok_or_else(|| rusqlite::Error::InvalidParameterName("abp dev_addr missing".to_string()))?;
+                parse_hex_dev_addr(addr_str)
+                    .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?
             }
             ActivationMode::Otaa => match d.dev_addr.as_ref() {
                 None => continue,
@@ -402,8 +423,12 @@ fn apply_lns_config_inner(
             },
         };
         let dev_addr = DevAddr(dev_addr_u);
-        let dev_eui_b = parse_hex_dev_eui(&d.dev_eui).expect("validated lns config");
-        let region: RegionId = d.region.parse().expect("validated lns config");
+        let dev_eui_b = parse_hex_dev_eui(&d.dev_eui)
+            .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
+        let region: RegionId = d
+            .region
+            .parse()
+            .map_err(|e: String| rusqlite::Error::InvalidParameterName(e))?;
         let sql_sel = schema::sql_select_session_by_dev_addr();
         let existing = {
             let mut stmt = tx.prepare(sql_sel.as_str())?;
