@@ -28,4 +28,13 @@ pub struct SessionSnapshot {
     pub class: DeviceClass,
     pub uplink_frame_counter: u32,
     pub downlink_frame_counter: u32,
+    /// LNS application id (from declarative config / SQLite sync); optional for legacy rows.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub application_id: Option<String>,
+    /// Network session key (AES-128); used for MIC verification.
+    /// NOTE: stored as plaintext BLOB in SQLite; encryption at rest is deferred to Phase 4 (SEC-02).
+    pub nwk_s_key: [u8; 16],
+    /// Application session key (AES-128); used for payload decryption.
+    /// NOTE: stored as plaintext BLOB in SQLite; encryption at rest is deferred to Phase 4 (SEC-02).
+    pub app_s_key: [u8; 16],
 }

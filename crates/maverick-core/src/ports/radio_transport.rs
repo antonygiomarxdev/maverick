@@ -9,11 +9,16 @@ pub struct UplinkObservation {
     pub gateway_eui: GatewayEui,
     pub dev_addr: DevAddr,
     pub region: RegionId,
-    pub f_cnt: u32,
+    /// Wire-level 16-bit frame counter; reconstruction to 32-bit happens in the protocol module.
+    pub f_cnt: u16,
     pub f_port: u8,
     pub payload: Vec<u8>,
     pub rssi: Option<i16>,
     pub snr: Option<f32>,
+    /// Raw MIC bytes (last 4 bytes of the PHY payload); preserved from parser for MIC verification.
+    pub wire_mic: [u8; 4],
+    /// PHY payload excluding the trailing 4 MIC bytes; used by MIC verifier.
+    pub phy_without_mic: Vec<u8>,
 }
 
 /// Downlink command to be encoded and sent by a concrete transport adapter.
