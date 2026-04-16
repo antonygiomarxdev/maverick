@@ -9,6 +9,9 @@ use crate::ports::{
 };
 use crate::protocol::{FcntError, LoRaWAN10xClassA, ProtocolCapability, ProtocolContext};
 
+/// Dedup window: same (dev_addr, f_cnt) within this window is a duplicate (multi-gateway).
+const DEDUP_WINDOW_MS: i64 = 30_000;
+
 /// Application service: validate uplink via protocol module, persist, audit.
 pub struct IngestUplink {
     pub sessions: Arc<dyn SessionRepository>,
@@ -201,6 +204,20 @@ impl IngestUplink {
             ))
         };
 
+        // 6b. Duplicate detection — SQLite-backed, 30 s window for multi-gateway dedup
+        if self
+            .uplinks
+            .is_duplicate(obs.dev_addr, reconstructed_fcnt, DEDUP_WINDOW_MS)
+            .await?
+        {
+            tracing::debug!(
+                dev_addr = format!("{:08x}", obs.dev_addr.0),
+                f_cnt = reconstructed_fcnt,
+                "duplicate uplink discarded"
+            );
+            return Ok(());
+        }
+
         // 7. Persist uplink
         self.uplinks
             .append(&UplinkRecord {
@@ -268,6 +285,15 @@ mod tests {
         async fn append(&self, record: &UplinkRecord) -> AppResult<()> {
             self.0.lock().await.push(record.clone());
             Ok(())
+        }
+
+        async fn is_duplicate(
+            &self,
+            _dev_addr: DevAddr,
+            _f_cnt: u32,
+            _window_ms: i64,
+        ) -> AppResult<bool> {
+            Ok(false) // Unit-test stub: never a duplicate
         }
     }
 

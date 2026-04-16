@@ -20,4 +20,10 @@ pub struct UplinkRecord {
 #[async_trait]
 pub trait UplinkRepository: Send + Sync {
     async fn append(&self, record: &UplinkRecord) -> AppResult<()>;
+
+    /// Returns true if an uplink with the same (dev_addr, f_cnt) was persisted within
+    /// the given time window. Used for multi-gateway duplicate suppression (PROT-06).
+    ///
+    /// `window_ms` is the look-back window in milliseconds (typically 30_000 for 30 s).
+    async fn is_duplicate(&self, dev_addr: DevAddr, f_cnt: u32, window_ms: i64) -> AppResult<bool>;
 }

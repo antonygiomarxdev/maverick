@@ -95,6 +95,30 @@ impl UplinkRepository for SqlitePersistence {
         })
         .await
     }
+
+    async fn is_duplicate(&self, dev_addr: DevAddr, f_cnt: u32, window_ms: i64) -> AppResult<bool> {
+        let this = self.clone();
+        let key = dev_addr.0 as i64;
+        let fcnt = f_cnt as i64;
+        this.run_blocking(move |p| {
+            p.run_with_busy_retry(|conn| {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let now_ms = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_millis().min(i64::MAX as u128) as i64)
+                    .unwrap_or(0);
+                let cutoff_ms = now_ms - window_ms;
+                let sql = schema::sql_check_uplink_dedup();
+                let count: i64 = conn.query_row(
+                    sql.as_str(),
+                    rusqlite::params![key, fcnt, cutoff_ms],
+                    |r| r.get(0),
+                )?;
+                Ok(count > 0)
+            })
+        })
+        .await
+    }
 }
 
 #[async_trait]
