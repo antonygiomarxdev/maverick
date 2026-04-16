@@ -2,6 +2,9 @@ use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
 use maverick_adapter_persistence_sqlite::{SqlitePersistence, SqlitePersistenceOptions};
+use maverick_core::lns_config::{
+    ActivationMode, ApplicationEntry, AutoprovisionPolicy, DeviceEntry, LnsConfigDocument, OtaaKeys,
+};
 use maverick_core::ports::{SessionRepository, UplinkObservation, UplinkRecord, UplinkRepository};
 use maverick_core::protocol::LoRaWAN10xClassA;
 use maverick_core::storage::StoragePressureSource;
@@ -12,9 +15,53 @@ use maverick_domain::{DevAddr, DevEui, DeviceClass, GatewayEui, RegionId, Sessio
 use rusqlite::Connection;
 
 #[test]
+fn sqlite_apply_lns_otaa_without_dev_addr() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("lns_otaa.db");
+    let policy = InstallProfile::Balanced.default_storage_policy();
+    let p = SqlitePersistence::open(&db, policy, SqlitePersistenceOptions::default()).unwrap();
+    let doc = LnsConfigDocument {
+        schema_version: 1,
+        autoprovision: AutoprovisionPolicy::default(),
+        applications: vec![ApplicationEntry {
+            id: "app1".to_string(),
+            name: "A".to_string(),
+            default_region: "EU868".to_string(),
+        }],
+        devices: vec![DeviceEntry {
+            activation_mode: ActivationMode::Otaa,
+            dev_eui: "0102030405060708".to_string(),
+            dev_addr: None,
+            application_id: "app1".to_string(),
+            region: "EU868".to_string(),
+            enabled: true,
+            otaa: Some(OtaaKeys {
+                join_eui: "0000000000000000".to_string(),
+                app_key: "00000000000000000000000000000000".to_string(),
+                nwk_key: None,
+            }),
+            abp: None,
+        }],
+    };
+    p.apply_lns_config(&doc).expect("apply lns");
+    let rows = p.lns_list_devices().expect("list");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].activation_mode, "otaa");
+    assert!(rows[0].dev_addr_hex.is_none());
+}
+
+#[test]
 fn sqlite_ddl_defines_tables_matching_schema_names() {
     use maverick_adapter_persistence_sqlite::schema::{names, DDL_INIT};
-    for t in [names::SESSIONS, names::UPLINKS, names::AUDIT_EVENTS] {
+    for t in [
+        names::SESSIONS,
+        names::UPLINKS,
+        names::AUDIT_EVENTS,
+        names::LNS_APPLICATIONS,
+        names::LNS_DEVICES,
+        names::LNS_PENDING,
+        names::LNS_META,
+    ] {
         assert!(DDL_INIT.contains(t), "schema.sql must define table {t}");
     }
 }
@@ -34,6 +81,9 @@ async fn ingest_uplink_persists_via_sqlite_adapter() {
         class: DeviceClass::ClassA,
         uplink_frame_counter: 0,
         downlink_frame_counter: 0,
+        application_id: None,
+        nwk_s_key: [0u8; 16],
+        app_s_key: [0u8; 16],
     };
     SessionRepository::upsert(&store, &session)
         .await
@@ -55,6 +105,8 @@ async fn ingest_uplink_persists_via_sqlite_adapter() {
         payload: vec![0x01, 0x02],
         rssi: None,
         snr: None,
+        wire_mic: [0u8; 4],
+        phy_without_mic: vec![],
     };
     svc.execute(obs).await.expect("ingest");
 
@@ -79,6 +131,9 @@ fn sample_session(dev_addr: u32) -> SessionSnapshot {
         class: DeviceClass::ClassA,
         uplink_frame_counter: 0,
         downlink_frame_counter: 0,
+        application_id: None,
+        nwk_s_key: [0u8; 16],
+        app_s_key: [0u8; 16],
     }
 }
 
@@ -99,6 +154,9 @@ async fn sqlite_recovery_after_reopen_preserves_session_and_uplink() {
                 dev_addr: DevAddr(0x01_02_03_04),
                 f_cnt: 1,
                 payload: vec![0xAB],
+                application_id: None,
+                received_at_ms: 0,
+                payload_decrypted: None,
             },
         )
         .await
@@ -128,6 +186,9 @@ async fn sqlite_telemetry_retention_drops_oldest_uplinks() {
                 dev_addr: DevAddr(0x01_02_03_04),
                 f_cnt: i,
                 payload: vec![i as u8],
+                application_id: None,
+                received_at_ms: 0,
+                payload_decrypted: None,
             },
         )
         .await
@@ -164,6 +225,9 @@ async fn sqlite_concurrent_transaction_waits_on_busy_then_succeeds() {
         dev_addr: DevAddr(1),
         f_cnt: 1,
         payload: vec![1],
+        application_id: None,
+        received_at_ms: 0,
+        payload_decrypted: None,
     };
     let res = UplinkRepository::append(&p, &rec).await;
     t.join().expect("join");

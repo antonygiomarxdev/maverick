@@ -25,6 +25,9 @@ async fn operator_local_gateway_flow_ingests_and_persists_uplink() {
         class: DeviceClass::ClassA,
         uplink_frame_counter: 0,
         downlink_frame_counter: 0,
+        application_id: None,
+        nwk_s_key: [0u8; 16],
+        app_s_key: [0u8; 16],
     };
     SessionRepository::upsert(&store, &session)
         .await

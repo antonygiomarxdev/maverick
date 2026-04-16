@@ -428,7 +428,7 @@ fn apply_lns_config_inner(
         let region: RegionId = d
             .region
             .parse()
-            .map_err(|e: String| rusqlite::Error::InvalidParameterName(e))?;
+            .map_err(|e: maverick_domain::region::UnknownRegionError| rusqlite::Error::InvalidParameterName(e.to_string()))?;
         let sql_sel = schema::sql_select_session_by_dev_addr();
         let existing = {
             let mut stmt = tx.prepare(sql_sel.as_str())?;

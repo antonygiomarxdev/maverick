@@ -35,8 +35,12 @@ impl LoRaWAN10xClassA {
         let candidate_high = candidate_low.wrapping_add(0x1_0000);
 
         if candidate_low > session_fcnt {
-            // Normal forward progress — no rollover needed
-            Ok(candidate_low)
+            // Forward progress — reject if gap too large (LoRaWAN spec §4.3.1.5)
+            if candidate_low - session_fcnt > MAX_FCNT_GAP {
+                Err(FcntError::GapExceeded)
+            } else {
+                Ok(candidate_low)
+            }
         } else if session_fcnt.wrapping_sub(candidate_low) <= MAX_FCNT_GAP {
             // candidate_low <= session_fcnt AND within gap window → duplicate/replay
             Err(FcntError::Duplicate)
