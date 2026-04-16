@@ -1,13 +1,13 @@
-//! GWMP/UDP uplink receive loop (composition root selects this backend today).
+//! Radio uplink receive loop: GWMP/UDP or SPI concentrator (`[radio]` in `lns-config.toml`).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use maverick_adapter_persistence_sqlite::{SqlitePersistence, SqlitePersistenceOptions};
-use maverick_adapter_radio_udp::{GwmpUdpIngressBackend, GwmpUdpUplinkSource};
+use maverick_adapter_radio_udp::GwmpUdpIngressBackend;
 use maverick_core::ports::{
-    AuditSink, SessionRepository, UplinkIngressBackend, UplinkReceive, UplinkRepository, UplinkSource,
+    AuditSink, SessionRepository, UplinkIngressBackend, UplinkReceive, UplinkRepository,
 };
 use maverick_core::protocol::LoRaWAN10xClassA;
 use maverick_core::use_cases::IngestUplink;
@@ -17,12 +17,49 @@ use crate::edge_json::{self, RadioIngestCounters};
 use crate::ingest::lns_guard::ingest_uplink_with_lns_guard;
 use crate::paths::db_path;
 use crate::probe::{total_disk_bytes_hint, HardwareCapabilities};
-use crate::runtime_capabilities;
+use crate::radio_ingest_selection::{
+    build_uplink_source, resolve_radio_ingest, RadioIngestSelection,
+};
+use crate::runtime_capabilities::{self, RuntimeCapabilityReport};
+
+#[cfg(feature = "spi")]
+use maverick_adapter_radio_spi::SpiConcentratorIngressBackend;
 
 fn sqlite_opts() -> SqlitePersistenceOptions {
     SqlitePersistenceOptions {
         total_disk_bytes: total_disk_bytes_hint(),
         ..SqlitePersistenceOptions::default()
+    }
+}
+
+fn listen_label(selection: &RadioIngestSelection) -> &str {
+    match selection {
+        RadioIngestSelection::Udp { bind } => bind.as_str(),
+        RadioIngestSelection::Spi { spi_path } => spi_path.as_str(),
+    }
+}
+
+fn trace_ingest_identity(selection: &RadioIngestSelection) {
+    match selection {
+        RadioIngestSelection::Udp { .. } => {
+            let backend = GwmpUdpIngressBackend;
+            tracing::info!(
+                backend_id = backend.id(),
+                backend_kind = ?backend.kind(),
+                "uplink ingress backend (GWMP/UDP)"
+            );
+        }
+        #[cfg(feature = "spi")]
+        RadioIngestSelection::Spi { .. } => {
+            let backend = SpiConcentratorIngressBackend;
+            tracing::info!(
+                backend_id = backend.id(),
+                backend_kind = ?backend.kind(),
+                "uplink ingress backend (SPI concentrator)"
+            );
+        }
+        #[cfg(not(feature = "spi"))]
+        RadioIngestSelection::Spi { .. } => {}
     }
 }
 
@@ -33,11 +70,29 @@ pub(crate) async fn run_radio_ingest_once(
     db_file: &str,
 ) {
     let timeout = Duration::from_millis(timeout_ms.max(1));
-    let source = match GwmpUdpUplinkSource::bind(bind.as_str(), timeout).await {
+    let lns_path = Path::new(DEFAULT_LNS_CONFIG_PATH);
+    let selection = match resolve_radio_ingest(lns_path, bind.clone()) {
         Ok(s) => s,
         Err(e) => {
             let out = edge_json::radio_ingest_result(
                 bind.as_str(),
+                timeout_ms,
+                0,
+                0,
+                0,
+                1,
+                Some(e),
+            );
+            println!("{}", serde_json::to_string(&out).expect("ingest result"));
+            return;
+        }
+    };
+    let label = listen_label(&selection).to_string();
+    let source = match build_uplink_source(selection.clone(), timeout).await {
+        Ok(s) => s,
+        Err(e) => {
+            let out = edge_json::radio_ingest_result(
+                label.as_str(),
                 timeout_ms,
                 0,
                 0,
@@ -58,7 +113,7 @@ pub(crate) async fn run_radio_ingest_once(
         Ok(v) => Arc::new(v),
         Err(e) => {
             let out = edge_json::radio_ingest_result(
-                bind.as_str(),
+                label.as_str(),
                 timeout_ms,
                 0,
                 0,
@@ -71,16 +126,9 @@ pub(crate) async fn run_radio_ingest_once(
         }
     };
 
-    let backend = GwmpUdpIngressBackend;
-    tracing::info!(
-        backend_id = backend.id(),
-        backend_kind = ?backend.kind(),
-        "uplink ingress backend (GWMP/UDP)"
-    );
-    runtime_capabilities::log_startup_snapshot(
-        &bind,
-        Some(std::path::Path::new(DEFAULT_LNS_CONFIG_PATH)),
-    );
+    trace_ingest_identity(&selection);
+    let report = RuntimeCapabilityReport::build(bind.clone(), Some(lns_path));
+    runtime_capabilities::log_ingest_capability_report(&report);
 
     let sessions: Arc<dyn SessionRepository> = store.clone();
     let uplinks: Arc<dyn UplinkRepository> = store.clone();
@@ -96,7 +144,7 @@ pub(crate) async fn run_radio_ingest_once(
         Ok(r) => r,
         Err(e) => {
             let out = edge_json::radio_ingest_result(
-                bind.as_str(),
+                label.as_str(),
                 timeout_ms,
                 0,
                 0,
@@ -112,7 +160,7 @@ pub(crate) async fn run_radio_ingest_once(
     match recv {
         UplinkReceive::Idle => {
             let out = edge_json::radio_ingest_result(
-                bind.as_str(),
+                label.as_str(),
                 timeout_ms,
                 0,
                 0,
@@ -135,7 +183,7 @@ pub(crate) async fn run_radio_ingest_once(
                 }
             }
             let out = edge_json::radio_ingest_result(
-                bind.as_str(),
+                label.as_str(),
                 timeout_ms,
                 1,
                 ingested + failed,
@@ -156,11 +204,33 @@ pub(crate) async fn run_radio_ingest_supervised(
     db_file: &str,
 ) {
     let timeout = Duration::from_millis(read_timeout_ms.max(1));
-    let source = match GwmpUdpUplinkSource::bind(bind.as_str(), timeout).await {
+    let lns_path = Path::new(DEFAULT_LNS_CONFIG_PATH);
+    let selection = match resolve_radio_ingest(lns_path, bind.clone()) {
         Ok(s) => s,
         Err(e) => {
             let out = edge_json::radio_ingest_loop_result(
                 bind.as_str(),
+                read_timeout_ms,
+                RadioIngestCounters {
+                    looped: true,
+                    failed: 1,
+                    ..RadioIngestCounters::default()
+                },
+                Some(e),
+            );
+            println!(
+                "{}",
+                serde_json::to_string(&out).expect("ingest-loop result")
+            );
+            std::process::exit(1);
+        }
+    };
+    let label = listen_label(&selection).to_string();
+    let source = match build_uplink_source(selection.clone(), timeout).await {
+        Ok(s) => s,
+        Err(e) => {
+            let out = edge_json::radio_ingest_loop_result(
+                label.as_str(),
                 read_timeout_ms,
                 RadioIngestCounters {
                     looped: true,
@@ -184,7 +254,7 @@ pub(crate) async fn run_radio_ingest_supervised(
         Ok(v) => Arc::new(v),
         Err(e) => {
             let out = edge_json::radio_ingest_loop_result(
-                bind.as_str(),
+                label.as_str(),
                 read_timeout_ms,
                 RadioIngestCounters {
                     looped: true,
@@ -201,16 +271,9 @@ pub(crate) async fn run_radio_ingest_supervised(
         }
     };
 
-    let backend = GwmpUdpIngressBackend;
-    tracing::info!(
-        backend_id = backend.id(),
-        backend_kind = ?backend.kind(),
-        "uplink ingress backend (GWMP/UDP)"
-    );
-    runtime_capabilities::log_startup_snapshot(
-        &bind,
-        Some(std::path::Path::new(DEFAULT_LNS_CONFIG_PATH)),
-    );
+    trace_ingest_identity(&selection);
+    let report = RuntimeCapabilityReport::build(bind.clone(), Some(lns_path));
+    runtime_capabilities::log_ingest_capability_report(&report);
 
     let sessions: Arc<dyn SessionRepository> = store.clone();
     let uplinks: Arc<dyn UplinkRepository> = store.clone();
@@ -257,7 +320,7 @@ pub(crate) async fn run_radio_ingest_supervised(
         }
     }
     let out = edge_json::radio_ingest_loop_result(
-        bind.as_str(),
+        label.as_str(),
         read_timeout_ms,
         RadioIngestCounters {
             looped: true,

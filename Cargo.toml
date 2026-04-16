@@ -6,6 +6,7 @@ members = [
     "crates/maverick-extension-contracts",
     "crates/maverick-extension-tui",
     "crates/maverick-adapter-radio-udp",
+    "crates/maverick-adapter-radio-spi",
     "crates/maverick-adapter-persistence-sqlite",
     "crates/maverick-runtime-edge",
     "crates/maverick-cloud-core",
@@ -24,6 +25,7 @@ maverick-domain = { path = "crates/maverick-domain", version = "0.1.0" }
 maverick-core = { path = "crates/maverick-core", version = "0.1.0" }
 maverick-extension-contracts = { path = "crates/maverick-extension-contracts", version = "0.1.0" }
 maverick-adapter-radio-udp = { path = "crates/maverick-adapter-radio-udp", version = "0.1.0" }
+maverick-adapter-radio-spi = { path = "crates/maverick-adapter-radio-spi", version = "0.1.0", default-features = false }
 maverick-adapter-persistence-sqlite = { path = "crates/maverick-adapter-persistence-sqlite", version = "0.1.0" }
 maverick-runtime-edge = { path = "crates/maverick-runtime-edge", version = "0.1.0" }
 maverick-cloud-core = { path = "crates/maverick-cloud-core", version = "0.1.0" }
@@ -31,6 +33,7 @@ async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
 base64 = "0.22"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 02 — 02-A/02-B/02-D executed; 02-C (SPI + libloragw) pending
+stopped_at: Phase 02 complete (all plans); Phase 03 not yet planned
 last_updated: "2026-04-16"
-last_activity: 2026-04-16 -- Phase 02: UplinkSource + UDP refactor + hardware registry doc
+last_activity: 2026-04-16 -- Phase 02: SPI crate + `--features spi` + radio resolve
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 9
-  percent: 35
+  completed_plans: 10
+  percent: 40
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** Never lose a LoRaWAN uplink — from radio to SQLite, data is preserved regardless of internet connectivity, extension state, or process restarts.
-**Current focus:** Phase 02 — Radio Abstraction & SPI
+**Current focus:** Phase 03 — Class A Downlink (not planned yet)
 
 ## Current Position
 
-Phase: 02 (Radio Abstraction & SPI) — IN PROGRESS
-Plan: 3 of 4 executed (02-C SPI adapter not started)
-Status: Implement 02-C-PLAN next (libloragw / `spi` feature)
-Last activity: 2026-04-16 -- Phase 02: 02-A, 02-B, 02-D shipped in repo
+Phase: 02 (Radio Abstraction & SPI) — COMPLETE (libloragw RX still placeholder)
+Plan: 4 of 4 executed
+Status: Plan Phase 3 (Class A Downlink) or wire libloragw RX
+Last activity: 2026-04-16 -- Phase 02 closed out in repo
 
-Progress: [███░░░░░░░] 35% (milestone rough: Phase 1 done + Phase 2 partial)
+Progress: [████░░░░░░] 40% (2/5 phases done at roadmap level)
 
 ## Performance Metrics
 
@@ -86,5 +86,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-16 (resumed)
-Stopped at: Phase 02 — next up 02-C-PLAN (SPI / libloragw)
+Stopped at: Phase 02 done — next `/gsd-plan-phase 3` (or libloragw follow-up)
 Resume file: None

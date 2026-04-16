@@ -1,0 +1,18 @@
+[package]
+name = "maverick-adapter-radio-spi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SX1302/SX1303 SPI concentrator adapter (libloragw integration; feature-gated)"
+
+[features]
+default = []
+spi = []
+
+[dependencies]
+maverick-core = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync"] }
+
+[lints]
+workspace = true

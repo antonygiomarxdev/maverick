@@ -28,6 +28,7 @@ pub(crate) enum EdgeJsonKey {
     Ingested,
     Failed,
     Looped,
+    RuntimeCapabilities,
 }
 
 impl EdgeJsonKey {
@@ -55,6 +56,7 @@ impl EdgeJsonKey {
             EdgeJsonKey::Ingested => "ingested",
             EdgeJsonKey::Failed => "failed",
             EdgeJsonKey::Looped => "looped",
+            EdgeJsonKey::RuntimeCapabilities => "runtime_capabilities",
         }
     }
 }
@@ -96,6 +98,7 @@ pub(crate) fn status_document(
     suggested_profile: String,
     memory_bytes: u64,
     storage: Value,
+    runtime_capabilities: Value,
 ) -> Value {
     let mut root = Map::new();
     root.insert(
@@ -109,6 +112,7 @@ pub(crate) fn status_document(
     root.insert(key(EdgeJsonKey::SuggestedProfile), json!(suggested_profile));
     root.insert(key(EdgeJsonKey::MemoryBytes), json!(memory_bytes));
     root.insert(key(EdgeJsonKey::Storage), storage);
+    root.insert(key(EdgeJsonKey::RuntimeCapabilities), runtime_capabilities);
     Value::Object(root)
 }
 

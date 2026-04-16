@@ -8,18 +8,22 @@ use maverick_core::InstallProfile;
 mod cli_constants;
 mod commands;
 mod edge_json;
+mod ingest;
+mod paths;
 mod probe;
+mod radio_ingest_selection;
+mod runtime_capabilities;
 
 use cli_constants::{
     DEFAULT_DATA_DIR, DEFAULT_GWMP_BIND_ADDR, DEFAULT_GWMP_INGEST_TIMEOUT_MS,
-    DEFAULT_GWMP_LOOP_MAX_MESSAGES, DEFAULT_GWMP_LOOP_READ_TIMEOUT_MS, DEFAULT_RADIO_PROBE_HOST,
-    DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
+    DEFAULT_GWMP_LOOP_MAX_MESSAGES, DEFAULT_GWMP_LOOP_READ_TIMEOUT_MS, DEFAULT_LNS_CONFIG_PATH,
+    DEFAULT_RADIO_PROBE_HOST, DEFAULT_RADIO_PROBE_PORT, EDGE_DB_FILENAME,
 };
 use commands::{
-    run_health, run_probe, run_radio_downlink_probe, run_radio_ingest_once,
-    run_radio_ingest_supervised, run_recent_errors, run_status, run_storage_policy,
-    run_storage_pressure,
+    config, run_health, run_probe, run_radio_downlink_probe, run_recent_errors, run_setup,
+    run_status, run_storage_policy, run_storage_pressure,
 };
+use ingest::{run_radio_ingest_once, run_radio_ingest_supervised};
 
 #[derive(Parser)]
 #[command(name = "maverick-edge")]
@@ -36,6 +40,11 @@ struct Cli {
 enum Commands {
     /// Show process status summary
     Status,
+    /// Start setup wizard (interactive) or apply defaults in non-interactive mode
+    Setup {
+        #[arg(long)]
+        non_interactive: bool,
+    },
     /// Aggregate health from local probes
     Health,
     /// Print last N stderr-equivalent lines placeholder (structured logs live on disk in full impl)
@@ -43,8 +52,12 @@ enum Commands {
         #[arg(default_value = "20")]
         lines: usize,
     },
-    /// Dump hardware capability probe JSON
-    Probe,
+    /// Dump runtime capability report JSON (hardware, radio hints, ingest mode)
+    Probe {
+        /// Plain-text summary for operators instead of JSON
+        #[arg(long)]
+        summary: bool,
+    },
     /// Show effective storage policy for install profile
     StoragePolicy {
         #[arg(value_enum)]
@@ -56,6 +69,56 @@ enum Commands {
     Radio {
         #[command(subcommand)]
         cmd: RadioCmd,
+    },
+    /// Declarative LNS configuration file ↔ SQLite (`/etc/maverick/lns-config.toml`)
+    Config {
+        #[command(subcommand)]
+        cmd: ConfigCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCmd {
+    /// Write a starter `lns-config.toml` (fails if the file exists unless `--force`)
+    Init {
+        #[arg(long)]
+        force: bool,
+        #[arg(long, default_value = DEFAULT_LNS_CONFIG_PATH)]
+        config_path: PathBuf,
+    },
+    /// Parse and validate `lns-config.toml` without touching the database
+    Validate {
+        #[arg(long, default_value = DEFAULT_LNS_CONFIG_PATH)]
+        config_path: PathBuf,
+    },
+    /// Validate file and upsert applications/devices/sessions into SQLite
+    Load {
+        #[arg(long, default_value = DEFAULT_LNS_CONFIG_PATH)]
+        config_path: PathBuf,
+    },
+    /// Show autoprovision policy plus mirrored applications/devices/pending from SQLite
+    Show,
+    /// List applications (JSON array)
+    ListApps,
+    /// List devices (JSON array)
+    ListDevices,
+    /// List pending DevAddr rows (JSON array)
+    ListPending,
+    /// Approve a pending device by promoting it into `lns_devices` + `sessions`
+    ApproveDevice {
+        #[arg(long)]
+        dev_eui: String,
+        #[arg(long)]
+        dev_addr: String,
+        #[arg(long)]
+        application_id: String,
+        #[arg(long, default_value = "EU868")]
+        region: String,
+    },
+    /// Remove a pending DevAddr (does not delete an active device row)
+    RejectDevice {
+        #[arg(long)]
+        dev_addr: String,
     },
 }
 
@@ -92,7 +155,8 @@ enum RadioCmd {
         #[arg(
             long,
             default_value_t = DEFAULT_GWMP_LOOP_MAX_MESSAGES,
-            env = "MAVERICK_GWMP_LOOP_MAX_MESSAGES"
+            env = "MAVERICK_GWMP_LOOP_MAX_MESSAGES",
+            help = "Stop after this many UDP receive attempts (0 = run until process exit; use under systemd)"
         )]
         max_messages: u32,
     },
@@ -125,9 +189,10 @@ async fn main() {
     let db_file = EDGE_DB_FILENAME;
     match cli.command {
         Commands::Status => run_status(cli.data_dir, db_file).await,
+        Commands::Setup { non_interactive } => run_setup(non_interactive),
         Commands::Health => run_health(cli.data_dir, db_file).await,
         Commands::RecentErrors { lines } => run_recent_errors(lines),
-        Commands::Probe => run_probe(),
+        Commands::Probe { summary } => run_probe(summary),
         Commands::StoragePolicy { profile } => run_storage_policy(profile.into()),
         Commands::StoragePressure => run_storage_pressure(cli.data_dir, db_file).await,
         Commands::Radio { cmd } => match cmd {
@@ -148,6 +213,33 @@ async fn main() {
                     db_file,
                 )
                 .await
+            }
+        },
+        Commands::Config { cmd } => match cmd {
+            ConfigCmd::Init { force, config_path } => config::run_config_init(config_path, force),
+            ConfigCmd::Validate { config_path } => config::run_config_validate(config_path),
+            ConfigCmd::Load { config_path } => {
+                config::run_config_load(cli.data_dir, db_file, config_path)
+            }
+            ConfigCmd::Show => config::run_config_show(cli.data_dir, db_file),
+            ConfigCmd::ListApps => config::run_config_list_apps(cli.data_dir, db_file),
+            ConfigCmd::ListDevices => config::run_config_list_devices(cli.data_dir, db_file),
+            ConfigCmd::ListPending => config::run_config_list_pending(cli.data_dir, db_file),
+            ConfigCmd::ApproveDevice {
+                dev_eui,
+                dev_addr,
+                application_id,
+                region,
+            } => config::run_config_approve_device(
+                cli.data_dir,
+                db_file,
+                dev_eui,
+                dev_addr,
+                application_id,
+                region,
+            ),
+            ConfigCmd::RejectDevice { dev_addr } => {
+                config::run_config_reject_device(cli.data_dir, db_file, dev_addr)
             }
         },
     }

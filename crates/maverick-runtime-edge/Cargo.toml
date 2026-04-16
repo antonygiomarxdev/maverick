@@ -14,13 +14,19 @@ maverick-core = { workspace = true }
 maverick-domain = { workspace = true }
 maverick-adapter-persistence-sqlite = { workspace = true }
 maverick-adapter-radio-udp = { workspace = true }
+maverick-adapter-radio-spi = { workspace = true, optional = true }
 clap = { version = "4", features = ["derive", "env"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+toml = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 sysinfo = { workspace = true }
+
+[features]
+default = []
+spi = ["dep:maverick-adapter-radio-spi", "maverick-adapter-radio-spi/spi"]
 
 [lints]
 workspace = true

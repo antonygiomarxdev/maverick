@@ -1,32 +1,30 @@
 //! CLI command handlers (keeps `main` thin).
 
+pub mod config;
+
+use std::io::{ErrorKind, IsTerminal};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::Arc;
-use std::time::Duration;
 
 use maverick_adapter_persistence_sqlite::{SqlitePersistence, SqlitePersistenceOptions};
 use maverick_adapter_radio_udp::{ResiliencePolicy, ResilientRadioTransport, UdpDownlinkTransport};
 use maverick_core::health::{ComponentHealth, HealthState, HealthStatus};
-use maverick_core::ports::{
-    AuditSink, DownlinkFrame, RadioTransport, SessionRepository, UplinkRepository,
-};
-use maverick_core::protocol::LoRaWAN10xClassA;
-use maverick_core::use_cases::IngestUplink;
+use maverick_core::ports::{DownlinkFrame, RadioTransport};
 use maverick_core::{InstallProfile, StoragePressureLevel, StoragePressureSource};
 use maverick_domain::{identifiers::Eui64, DevAddr, GatewayEui};
-use tokio::net::UdpSocket;
+use serde_json::json;
 
 use crate::cli_constants::{
+    DEFAULT_GWMP_BIND_ADDR, DEFAULT_LNS_CONFIG_PATH, HEALTH_COMPONENT_RADIO_ENVIRONMENT,
     HEALTH_COMPONENT_STORAGE, RADIO_PROBE_PAYLOAD_BYTE, RECENT_ERRORS_NOT_WIRED_MESSAGE,
     STORAGE_OPEN_FAILED_PREFIX,
 };
-use crate::edge_json::{self, RadioIngestCounters, RadioProbeOutcome, RecentErrorsStubResponse};
+use crate::edge_json::{self, RadioProbeOutcome, RecentErrorsStubResponse};
+use crate::paths::db_path;
 use crate::probe::{health_from_probe, total_disk_bytes_hint, HardwareCapabilities};
-
-pub(crate) fn db_path(data_dir: &Path, edge_db_filename: &str) -> PathBuf {
-    data_dir.join(edge_db_filename)
-}
+use crate::runtime_capabilities::RuntimeCapabilityReport;
 
 fn storage_level_to_health(level: StoragePressureLevel) -> HealthStatus {
     match level {
@@ -44,8 +42,76 @@ fn sqlite_opts() -> SqlitePersistenceOptions {
     }
 }
 
+fn gwmp_bind_effective() -> String {
+    std::env::var("MAVERICK_GWMP_BIND").unwrap_or_else(|_| DEFAULT_GWMP_BIND_ADDR.to_string())
+}
+
+pub(crate) fn run_setup(non_interactive: bool) {
+    if !non_interactive && (!std::io::stdin().is_terminal() || !std::io::stdout().is_terminal()) {
+        eprintln!(
+            "setup requires an interactive terminal; run maverick-edge setup directly from a TTY"
+        );
+        std::process::exit(2);
+    }
+
+    let preferred =
+        std::env::var("MAVERICK_CONSOLE_BIN").unwrap_or_else(|_| "maverick".to_string());
+    let mut command = Command::new(&preferred);
+    command.arg("setup");
+    if non_interactive {
+        command.arg("--non-interactive");
+    }
+
+    let status = match command
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+    {
+        Ok(status) => status,
+        Err(error) if error.kind() == ErrorKind::NotFound && preferred != "maverick-edge-tui" => {
+            let mut legacy = Command::new("maverick-edge-tui");
+            legacy.arg("setup");
+            if non_interactive {
+                legacy.arg("--non-interactive");
+            }
+            match legacy
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()
+            {
+                Ok(status) => status,
+                Err(err) => {
+                    eprintln!(
+                        "failed to launch Maverick console ({preferred} / maverick-edge-tui): {err}. Install the console extension and ensure it is in PATH"
+                    );
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(error) => {
+            eprintln!(
+                "failed to launch Maverick console ({preferred}): {error}. Ensure the console extension is installed and in PATH"
+            );
+            std::process::exit(1);
+        }
+    };
+
+    if !status.success() {
+        if let Some(code) = status.code() {
+            std::process::exit(code);
+        }
+        std::process::exit(1);
+    }
+}
+
 pub(crate) async fn run_status(data_dir: PathBuf, db_file: &str) {
-    let cap = HardwareCapabilities::probe();
+    let report = RuntimeCapabilityReport::build(
+        gwmp_bind_effective(),
+        Some(Path::new(DEFAULT_LNS_CONFIG_PATH)),
+    );
+    let cap = report.hardware.clone();
     let dbp = db_path(&data_dir, db_file);
     let storage = if dbp.exists() {
         let profile = cap.suggested_install_profile();
@@ -61,18 +127,50 @@ pub(crate) async fn run_status(data_dir: PathBuf, db_file: &str) {
     } else {
         edge_json::storage_absent()
     };
+    let runtime_capabilities =
+        serde_json::to_value(&report).unwrap_or_else(|e| json!({ "error": e.to_string() }));
     let doc = edge_json::status_document(
         &data_dir,
         format!("{:?}", cap.suggested_install_profile()),
         cap.total_memory_bytes,
         storage,
+        runtime_capabilities,
     );
     println!("{}", serde_json::to_string(&doc).expect("status json"));
 }
 
 pub(crate) async fn run_health(data_dir: PathBuf, db_file: &str) {
-    let cap = HardwareCapabilities::probe();
+    let report = RuntimeCapabilityReport::build(
+        gwmp_bind_effective(),
+        Some(Path::new(DEFAULT_LNS_CONFIG_PATH)),
+    );
+    let cap = report.hardware.clone();
     let mut components = health_from_probe(&cap).components;
+    let radio_detail = format!(
+        "ingest={} bind={} snapshot_ms={} forwarder_hints={}",
+        report.selected_ingest.backend_id,
+        report.selected_ingest.listen_bind,
+        report.capability_snapshot.snapshot_id_ms,
+        report
+            .radio_environment
+            .packet_forwarder_service_hints
+            .len(),
+    );
+    let radio_status = if report
+        .radio_environment
+        .packet_forwarder_service_hints
+        .is_empty()
+        && cfg!(target_os = "linux")
+    {
+        HealthStatus::Degraded
+    } else {
+        HealthStatus::Healthy
+    };
+    components.push(ComponentHealth {
+        name: HEALTH_COMPONENT_RADIO_ENVIRONMENT.to_string(),
+        status: radio_status,
+        detail: Some(radio_detail),
+    });
     let dbp = db_path(&data_dir, db_file);
     if dbp.exists() {
         let profile = cap.suggested_install_profile();
@@ -111,12 +209,19 @@ pub(crate) fn run_recent_errors(lines: usize) {
     );
 }
 
-pub(crate) fn run_probe() {
-    let cap = HardwareCapabilities::probe();
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&cap).expect("probe json")
+pub(crate) fn run_probe(summary: bool) {
+    let report = RuntimeCapabilityReport::build(
+        gwmp_bind_effective(),
+        Some(Path::new(DEFAULT_LNS_CONFIG_PATH)),
     );
+    if summary {
+        print!("{}", report.format_operator_summary());
+    } else {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("probe json")
+        );
+    }
 }
 
 pub(crate) fn run_storage_policy(profile: InstallProfile) {
@@ -223,241 +328,4 @@ pub(crate) async fn run_radio_downlink_probe(host: String, port: u16) {
             println!("{}", serde_json::to_string(&v).expect("probe json"));
         }
     }
-}
-
-pub(crate) async fn run_radio_ingest_once(
-    bind: String,
-    timeout_ms: u64,
-    data_dir: PathBuf,
-    db_file: &str,
-) {
-    let socket = match UdpSocket::bind(bind.as_str()).await {
-        Ok(v) => v,
-        Err(e) => {
-            let out = edge_json::radio_ingest_result(
-                bind.as_str(),
-                timeout_ms,
-                0,
-                0,
-                0,
-                1,
-                Some(format!("bind failed: {e}")),
-            );
-            println!("{}", serde_json::to_string(&out).expect("ingest result"));
-            return;
-        }
-    };
-    let mut buf = vec![0_u8; 4096];
-    let timeout = Duration::from_millis(timeout_ms.max(1));
-    let recv_res = tokio::time::timeout(timeout, socket.recv_from(&mut buf)).await;
-    let (n, _addr) = match recv_res {
-        Ok(Ok(v)) => v,
-        Ok(Err(e)) => {
-            let out = edge_json::radio_ingest_result(
-                bind.as_str(),
-                timeout_ms,
-                0,
-                0,
-                0,
-                1,
-                Some(format!("recv failed: {e}")),
-            );
-            println!("{}", serde_json::to_string(&out).expect("ingest result"));
-            return;
-        }
-        Err(_) => {
-            let out = edge_json::radio_ingest_result(
-                bind.as_str(),
-                timeout_ms,
-                0,
-                0,
-                0,
-                0,
-                Some("listen timeout".to_string()),
-            );
-            println!("{}", serde_json::to_string(&out).expect("ingest result"));
-            return;
-        }
-    };
-
-    let dbp = db_path(&data_dir, db_file);
-    let cap = HardwareCapabilities::probe();
-    let profile = cap.suggested_install_profile();
-    let policy = profile.default_storage_policy();
-    let store = match SqlitePersistence::open(&dbp, policy, sqlite_opts()) {
-        Ok(v) => Arc::new(v),
-        Err(e) => {
-            let out = edge_json::radio_ingest_result(
-                bind.as_str(),
-                timeout_ms,
-                1,
-                0,
-                0,
-                1,
-                Some(format!("storage open failed: {e}")),
-            );
-            println!("{}", serde_json::to_string(&out).expect("ingest result"));
-            return;
-        }
-    };
-    let sessions: Arc<dyn SessionRepository> = store.clone();
-    let uplinks: Arc<dyn UplinkRepository> = store.clone();
-    let audit: Arc<dyn AuditSink> = store.clone();
-    let svc = IngestUplink {
-        sessions,
-        uplinks,
-        audit,
-        protocol: Arc::new(LoRaWAN10xClassA),
-    };
-
-    let parsed = match maverick_adapter_radio_udp::parse_push_data(&buf[..n]) {
-        Ok(v) => v,
-        Err(e) => {
-            let out = edge_json::radio_ingest_result(
-                bind.as_str(),
-                timeout_ms,
-                1,
-                0,
-                0,
-                1,
-                Some(e.to_string()),
-            );
-            println!("{}", serde_json::to_string(&out).expect("ingest result"));
-            return;
-        }
-    };
-
-    let mut ingested = 0_usize;
-    let mut failed = 0_usize;
-    for obs in parsed.observations {
-        match svc.execute(obs).await {
-            Ok(()) => ingested += 1,
-            Err(_) => failed += 1,
-        }
-    }
-
-    let out = edge_json::radio_ingest_result(
-        bind.as_str(),
-        timeout_ms,
-        1,
-        ingested + failed,
-        ingested,
-        failed,
-        None,
-    );
-    println!("{}", serde_json::to_string(&out).expect("ingest result"));
-}
-
-pub(crate) async fn run_radio_ingest_supervised(
-    bind: String,
-    read_timeout_ms: u64,
-    max_messages: u32,
-    data_dir: PathBuf,
-    db_file: &str,
-) {
-    let socket = match UdpSocket::bind(bind.as_str()).await {
-        Ok(v) => v,
-        Err(e) => {
-            let out = edge_json::radio_ingest_loop_result(
-                bind.as_str(),
-                read_timeout_ms,
-                RadioIngestCounters {
-                    looped: true,
-                    failed: 1,
-                    ..RadioIngestCounters::default()
-                },
-                Some(format!("bind failed: {e}")),
-            );
-            println!(
-                "{}",
-                serde_json::to_string(&out).expect("ingest-loop result")
-            );
-            return;
-        }
-    };
-    let dbp = db_path(&data_dir, db_file);
-    let cap = HardwareCapabilities::probe();
-    let profile = cap.suggested_install_profile();
-    let policy = profile.default_storage_policy();
-    let store = match SqlitePersistence::open(&dbp, policy, sqlite_opts()) {
-        Ok(v) => Arc::new(v),
-        Err(e) => {
-            let out = edge_json::radio_ingest_loop_result(
-                bind.as_str(),
-                read_timeout_ms,
-                RadioIngestCounters {
-                    looped: true,
-                    failed: 1,
-                    ..RadioIngestCounters::default()
-                },
-                Some(format!("storage open failed: {e}")),
-            );
-            println!(
-                "{}",
-                serde_json::to_string(&out).expect("ingest-loop result")
-            );
-            return;
-        }
-    };
-    let sessions: Arc<dyn SessionRepository> = store.clone();
-    let uplinks: Arc<dyn UplinkRepository> = store.clone();
-    let audit: Arc<dyn AuditSink> = store.clone();
-    let svc = IngestUplink {
-        sessions,
-        uplinks,
-        audit,
-        protocol: Arc::new(LoRaWAN10xClassA),
-    };
-
-    let timeout = Duration::from_millis(read_timeout_ms.max(1));
-    let mut received = 0_usize;
-    let mut parsed = 0_usize;
-    let mut ingested = 0_usize;
-    let mut failed = 0_usize;
-    let mut buf = vec![0_u8; 4096];
-    for _ in 0..max_messages.max(1) {
-        let recv_res = tokio::time::timeout(timeout, socket.recv_from(&mut buf)).await;
-        let (n, _addr) = match recv_res {
-            Ok(Ok(v)) => v,
-            Ok(Err(_)) => {
-                failed += 1;
-                continue;
-            }
-            Err(_) => {
-                // Idle timeout is expected in supervised mode.
-                continue;
-            }
-        };
-        received += 1;
-        match maverick_adapter_radio_udp::parse_push_data(&buf[..n]) {
-            Ok(batch) => {
-                parsed += batch.observations.len();
-                for obs in batch.observations {
-                    match svc.execute(obs).await {
-                        Ok(()) => ingested += 1,
-                        Err(_) => failed += 1,
-                    }
-                }
-            }
-            Err(_) => {
-                failed += 1;
-            }
-        }
-    }
-    let out = edge_json::radio_ingest_loop_result(
-        bind.as_str(),
-        read_timeout_ms,
-        RadioIngestCounters {
-            looped: true,
-            received,
-            parsed,
-            ingested,
-            failed,
-        },
-        None,
-    );
-    println!(
-        "{}",
-        serde_json::to_string(&out).expect("ingest-loop result")
-    );
 }
