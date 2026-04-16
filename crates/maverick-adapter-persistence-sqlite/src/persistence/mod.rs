@@ -83,6 +83,27 @@ impl SqlitePersistence {
             .unwrap_or(0)
     }
 
+    /// Checkpoint the SQLite WAL before process exit (RELI-02).
+    ///
+    /// Call from main() before std::process::exit to flush all committed WAL frames
+    /// to the main database file. rusqlite 0.33 Connection::drop does NOT trigger
+    /// WAL checkpoint automatically.
+    pub fn close(self) -> AppResult<()> {
+        if Arc::strong_count(&self.inner) == 1 {
+            let guard = self.inner.conn.lock().map_err(|_| {
+                AppError::Infrastructure(
+                    "mutex_poisoned: cannot checkpoint on close".to_string(),
+                )
+            })?;
+            guard
+                .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+                .map_err(|e| {
+                    AppError::Infrastructure(format!("wal_checkpoint on close: {e}"))
+                })?;
+        }
+        Ok(())
+    }
+
     async fn run_blocking<T: Send + 'static>(
         &self,
         f: impl FnOnce(&SqlitePersistence) -> AppResult<T> + Send + 'static,
