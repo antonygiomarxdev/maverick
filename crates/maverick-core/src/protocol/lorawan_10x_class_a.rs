@@ -3,6 +3,15 @@ use maverick_domain::{DeviceClass, LoRaWANVersion, RegionId};
 use crate::error::AppResult;
 use crate::protocol::{ProtocolCapability, ProtocolContext, ProtocolDecision};
 
+/// Error returned by `extend_fcnt` when a frame must be rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FcntError {
+    /// Wire FCnt falls within the gap window below session counter — frame is a duplicate or replay.
+    Duplicate,
+    /// Gap between reconstructed FCnt and session counter exceeds MAX_FCNT_GAP (16384).
+    GapExceeded,
+}
+
 /// LoRaWAN 1.0.x Class A policy module (v1 baseline regions).
 pub struct LoRaWAN10xClassA;
 
@@ -12,6 +21,32 @@ impl LoRaWAN10xClassA {
             region,
             RegionId::Eu868 | RegionId::Us915 | RegionId::Au915 | RegionId::As923 | RegionId::Eu433
         )
+    }
+
+    /// LoRaWAN 1.0.x §4.3.1.5 — extend 16-bit wire FCnt to 32-bit server counter.
+    ///
+    /// Returns `Ok(reconstructed_fcnt)` if the frame should be processed.
+    /// Returns `Err(FcntError::Duplicate)` if the frame counter is within the replay window.
+    /// Returns `Err(FcntError::GapExceeded)` if the gap exceeds `MAX_FCNT_GAP`.
+    pub fn extend_fcnt(wire_u16: u16, session_fcnt: u32) -> Result<u32, FcntError> {
+        const MAX_FCNT_GAP: u32 = 16384; // LoRaWAN spec §4.3.1.5
+
+        let candidate_low = (session_fcnt & 0xFFFF_0000) | u32::from(wire_u16);
+        let candidate_high = candidate_low.wrapping_add(0x1_0000);
+
+        if candidate_low > session_fcnt {
+            // Normal forward progress — no rollover needed
+            Ok(candidate_low)
+        } else if session_fcnt.wrapping_sub(candidate_low) <= MAX_FCNT_GAP {
+            // candidate_low <= session_fcnt AND within gap window → duplicate/replay
+            Err(FcntError::Duplicate)
+        } else if candidate_high.wrapping_sub(session_fcnt) <= MAX_FCNT_GAP {
+            // 16-bit rollover: low candidate is in the past but high candidate is close enough
+            Ok(candidate_high)
+        } else {
+            // Gap too large in both directions
+            Err(FcntError::GapExceeded)
+        }
     }
 }
 
@@ -40,11 +75,11 @@ impl ProtocolCapability for LoRaWAN10xClassA {
         if session.region != obs.region {
             return Ok(ProtocolDecision::RejectRegionMismatch);
         }
-        // LoRaWAN 1.0.x: uplink FCnt must be strictly greater than last seen (32-bit).
-        // obs.f_cnt is the 16-bit wire value; comparison against the stored 32-bit counter is
-        // intentionally truncated here — full 32-bit rollover logic lands in Plan B.
-        if (obs.f_cnt as u32) <= session.uplink_frame_counter {
-            return Ok(ProtocolDecision::RejectDuplicateFrameCounter);
+        // FCnt 32-bit reconstruction (LoRaWAN spec §4.3.1.5)
+        match Self::extend_fcnt(obs.f_cnt, session.uplink_frame_counter) {
+            Err(FcntError::Duplicate) => return Ok(ProtocolDecision::RejectDuplicateFrameCounter),
+            Err(FcntError::GapExceeded) => return Ok(ProtocolDecision::RejectFcntGapExceeded),
+            Ok(_reconstructed) => {} // Accept; IngestUplink::execute will use the reconstructed value
         }
         Ok(ProtocolDecision::Accept)
     }
@@ -111,6 +146,39 @@ mod tests {
         assert_eq!(
             m.validate_uplink(ctx).unwrap(),
             ProtocolDecision::RejectDuplicateFrameCounter
+        );
+    }
+
+    #[test]
+    fn extend_fcnt_no_rollover() {
+        assert_eq!(
+            LoRaWAN10xClassA::extend_fcnt(0x0010, 0x0000_0005),
+            Ok(0x0000_0010)
+        );
+    }
+
+    #[test]
+    fn extend_fcnt_rollover_at_16bit_boundary() {
+        assert_eq!(
+            LoRaWAN10xClassA::extend_fcnt(0x0001, 0x0000_FFFE),
+            Ok(0x0001_0001)
+        );
+    }
+
+    #[test]
+    fn extend_fcnt_duplicate_rejected() {
+        assert_eq!(
+            LoRaWAN10xClassA::extend_fcnt(0x0005, 0x0000_0010),
+            Err(FcntError::Duplicate)
+        );
+    }
+
+    #[test]
+    fn extend_fcnt_gap_exceeded_rejected() {
+        // Gap of 20000 > MAX_FCNT_GAP 16384
+        assert_eq!(
+            LoRaWAN10xClassA::extend_fcnt(0x9999, 0x0001_0000),
+            Err(FcntError::GapExceeded)
         );
     }
 }

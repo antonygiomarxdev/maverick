@@ -112,7 +112,8 @@ fn rxpk_to_observation(gateway_eui: GatewayEui, rx: Rxpk) -> AppResult<UplinkObs
     let decoded = B64
         .decode(rx.data.as_bytes())
         .map_err(|e| AppError::InvalidInput(format!("gwmp rxpk data base64: {e}")))?;
-    let (dev_addr, f_cnt, f_port, payload) = parse_lorawan_payload(&decoded)?;
+    let (dev_addr, f_cnt, f_port, payload, wire_mic, phy_without_mic) =
+        parse_lorawan_payload(&decoded)?;
     Ok(UplinkObservation {
         gateway_eui,
         dev_addr,
@@ -122,10 +123,12 @@ fn rxpk_to_observation(gateway_eui: GatewayEui, rx: Rxpk) -> AppResult<UplinkObs
         payload,
         rssi: rx.rssi,
         snr: rx.lsnr,
+        wire_mic,
+        phy_without_mic,
     })
 }
 
-fn parse_lorawan_payload(raw: &[u8]) -> AppResult<(DevAddr, u32, u8, Vec<u8>)> {
+fn parse_lorawan_payload(raw: &[u8]) -> AppResult<(DevAddr, u16, u8, Vec<u8>, [u8; 4], Vec<u8>)> {
     if raw.len() < LORAWAN_MACPAYLOAD_MIN_LEN {
         return Err(AppError::InvalidInput(
             "lorawan payload too short".to_string(),
@@ -136,8 +139,9 @@ fn parse_lorawan_payload(raw: &[u8]) -> AppResult<(DevAddr, u32, u8, Vec<u8>)> {
     let dev_addr = DevAddr(u32::from_le_bytes(dev_addr_bytes));
     let fctrl = raw[LORAWAN_FHDR_FCTRL_INDEX];
     let fopts_len = usize::from(fctrl & 0x0F);
-    let fcnt =
-        u16::from_le_bytes([raw[LORAWAN_FHDR_FCNT_START], raw[LORAWAN_FHDR_FCNT_END - 1]]) as u32;
+    // f_cnt is u16 — wire value; 32-bit reconstruction happens in protocol module
+    let fcnt_u16 =
+        u16::from_le_bytes([raw[LORAWAN_FHDR_FCNT_START], raw[LORAWAN_FHDR_FCNT_END - 1]]);
     let fport_index = LORAWAN_FHDR_FCNT_END + fopts_len;
     if raw.len() <= fport_index {
         return Err(AppError::InvalidInput(
@@ -152,22 +156,35 @@ fn parse_lorawan_payload(raw: &[u8]) -> AppResult<(DevAddr, u32, u8, Vec<u8>)> {
         ));
     }
     let mic_len = 4;
-    let frm_payload_end = if raw.len() >= frm_payload_start + mic_len {
-        raw.len() - mic_len
+    if raw.len() < mic_len {
+        return Err(AppError::InvalidInput(
+            "lorawan payload too short for MIC".to_string(),
+        ));
+    }
+    // Extract MIC (last 4 bytes) and PHY without MIC
+    let mut wire_mic = [0u8; 4];
+    wire_mic.copy_from_slice(&raw[raw.len() - mic_len..]);
+    let phy_without_mic = raw[..raw.len() - mic_len].to_vec();
+
+    let frm_payload_end = raw.len() - mic_len;
+    let payload = if frm_payload_start < frm_payload_end {
+        raw[frm_payload_start..frm_payload_end].to_vec()
     } else {
-        raw.len()
+        vec![]
     };
-    let payload = raw[frm_payload_start..frm_payload_end].to_vec();
-    Ok((dev_addr, fcnt, f_port, payload))
+    Ok((dev_addr, fcnt_u16, f_port, payload, wire_mic, phy_without_mic))
 }
 
 fn infer_region(freq_mhz: Option<f64>) -> RegionId {
     match freq_mhz {
-        Some(v) if (863.0..=870.0).contains(&v) => RegionId::Eu868,
-        Some(v) if (902.0..=928.0).contains(&v) => RegionId::Us915,
+        // AS923 first — most specific (overlaps with AU915 range)
+        Some(v) if (923.0..=923.5).contains(&v) => RegionId::As923,
+        // AU915 before US915 — AU915 (915–928 MHz) overlaps with US915 upper band
         Some(v) if (915.0..=928.0).contains(&v) => RegionId::Au915,
-        Some(v) if (920.0..=923.5).contains(&v) => RegionId::As923,
-        Some(v) if (923.0..=925.0).contains(&v) => RegionId::As923,
+        // US915 lower band (below 915 MHz, no overlap with AU915)
+        Some(v) if (902.0..915.0).contains(&v) => RegionId::Us915,
+        Some(v) if (863.0..=870.0).contains(&v) => RegionId::Eu868,
+        Some(v) if (433.0..=434.8).contains(&v) => RegionId::Eu433,
         _ => RegionId::Eu868,
     }
 }
@@ -209,5 +226,32 @@ mod tests {
         }"#;
         let batch = parse_push_data_json(gw, 2, body).expect("batch");
         assert_eq!(batch.observations.len(), 2);
+    }
+
+    #[test]
+    fn infer_region_au915_not_shadowed_by_us915() {
+        // 916.8 MHz is AU915 uplink channel 8
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = r#"{"rxpk":[{"freq":916.8,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
+        let batch = parse_push_data_json(gw, 2, body).expect("batch");
+        assert_eq!(batch.observations[0].region, RegionId::Au915);
+    }
+
+    #[test]
+    fn infer_region_as923_identified() {
+        // 923.2 MHz is AS923 channel
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = r#"{"rxpk":[{"freq":923.2,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
+        let batch = parse_push_data_json(gw, 2, body).expect("batch");
+        assert_eq!(batch.observations[0].region, RegionId::As923);
+    }
+
+    #[test]
+    fn infer_region_us915_below_915() {
+        // 903.9 MHz is US915 channel 7
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = r#"{"rxpk":[{"freq":903.9,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
+        let batch = parse_push_data_json(gw, 2, body).expect("batch");
+        assert_eq!(batch.observations[0].region, RegionId::Us915);
     }
 }
