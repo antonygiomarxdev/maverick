@@ -12,7 +12,7 @@ Maverick ships in five phases that build on each other from the ground up. Phase
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Protocol Correctness** - MIC verification, 32-bit FCnt, session keys, region fix, and reliability groundwork
+- [x] **Phase 1: Protocol Correctness** - MIC verification, 32-bit FCnt, session keys, region fix, and reliability groundwork
 - [ ] **Phase 2: Radio Abstraction & SPI** - UplinkSource port trait, direct SPI adapter, hardware registry, UDP hardening
 - [ ] **Phase 3: Class A Downlink** - RX1/RX2 window scheduling, ACK flag, persistent downlink queue
 - [ ] **Phase 4: Process Supervision** - systemd Restart=always, watchdog, key-at-rest protection
@@ -34,12 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 6 plans
 
 Plans:
-- [ ] 01-A-PLAN.md — Domain model + schema foundations (SessionSnapshot keys, UplinkObservation wire_mic/u16 f_cnt, schema migration, UplinkRecord decrypted payload)
-- [ ] 01-B-PLAN.md — FCnt 32-bit extension + region inference fix (extend_fcnt, MAX_FCNT_GAP, infer_region AU915/AS923 arm ordering, GWMP parser wire_mic)
-- [ ] 01-C-PLAN.md — MIC verification + AppSKey decryption (IngestUplink execute pipeline, aes 0.9 + cmac 0.8)
-- [ ] 01-D-PLAN.md — SQLite dedup (is_duplicate port method, UplinkRepository impl, execute dedup check)
-- [ ] 01-E-PLAN.md — Reliability fixes (.expect() audit in lns_ops.rs, SqlitePersistence::close(), process::exit cleanup)
-- [ ] 01-F-PLAN.md — UDP bind default + CORE-01 audit (127.0.0.1:17000, zero external HTTP/DNS verification)
+- [x] 01-A-PLAN.md — Domain model + schema foundations (SessionSnapshot keys, UplinkObservation wire_mic/u16 f_cnt, schema migration, UplinkRecord decrypted payload)
+- [x] 01-B-PLAN.md — FCnt 32-bit extension + region inference fix (extend_fcnt, MAX_FCNT_GAP, infer_region AU915/AS923 arm ordering, GWMP parser wire_mic)
+- [x] 01-C-PLAN.md — MIC verification + AppSKey decryption (IngestUplink execute pipeline, aes 0.9 + cmac 0.8)
+- [x] 01-D-PLAN.md — SQLite dedup (is_duplicate port method, UplinkRepository impl, execute dedup check)
+- [x] 01-E-PLAN.md — Reliability fixes (.expect() audit in lns_ops.rs, SqlitePersistence::close(), process::exit cleanup)
+- [x] 01-F-PLAN.md — UDP bind default + CORE-01 audit (127.0.0.1:17000, zero external HTTP/DNS verification)
 
 ### Phase 2: Radio Abstraction & SPI
 **Goal**: The ingest loop is radio-agnostic and Maverick can read frames directly from an SX1302/SX1303 concentrator via SPI — no external packet forwarder required
