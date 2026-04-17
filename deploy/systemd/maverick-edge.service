@@ -1,0 +1,24 @@
+[Unit]
+Description=Maverick Edge LoRaWAN LNS
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/maverick-edge run
+Restart=always
+RestartSec=2s
+WatchdogSec=30s
+User=maverick
+Group=maverick
+Environment=RUST_LOG=info
+EnvironmentFile=-/etc/maverick/edge.env
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/maverick /etc/maverick
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
