@@ -3,12 +3,14 @@
 use async_trait::async_trait;
 use maverick_core::error::{AppError, AppResult};
 use maverick_core::ports::{
-    AuditRecord, AuditSink, SessionRepository, UplinkRecord, UplinkRepository,
+    AuditRecord, AuditSink, DownlinkEnqueue, DownlinkItem, DownlinkRepository, SessionRepository,
+    UplinkRecord, UplinkRepository,
 };
 use maverick_core::storage::{
     StoragePressureLevel, StoragePressureSnapshot, StoragePressureSource,
 };
-use maverick_domain::{DevAddr, SessionSnapshot};
+use maverick_domain::identifiers::Eui64;
+use maverick_domain::{DevAddr, DevEui, SessionSnapshot};
 use rusqlite::params;
 
 use crate::persisted_device_class::PersistedDeviceClassTag;
@@ -117,6 +119,104 @@ impl UplinkRepository for SqlitePersistence {
             })
         })
         .await
+    }
+}
+
+#[async_trait]
+impl DownlinkRepository for SqlitePersistence {
+    async fn enqueue(&self, item: &DownlinkEnqueue) -> AppResult<u64> {
+        let item = item.clone();
+        let this = self.clone();
+        this.run_blocking(move |p| {
+            p.run_with_busy_retry(|conn| {
+                let ts = now_ms().0;
+                let sql = schema::sql_insert_downlink();
+                conn.execute(
+                    sql.as_str(),
+                    params![
+                        &item.dev_eui.0 .0[..],
+                        0i64,
+                        item.f_port as i64,
+                        &item.payload[..],
+                        item.confirmed as i64,
+                        0i64,
+                        ts,
+                        0i64,
+                    ],
+                )?;
+                Ok(conn.last_insert_rowid() as u64)
+            })
+        })
+        .await
+    }
+
+    async fn dequeue_oldest(&self, dev_eui: &DevEui, limit: usize) -> AppResult<Vec<DownlinkItem>> {
+        let dev_eui = dev_eui.clone();
+        let this = self.clone();
+        this.run_blocking(move |p| {
+            p.run_with_busy_retry(|conn| {
+                let sql = schema::sql_select_pending_downlinks();
+                let mut stmt = conn.prepare(sql.as_str())?;
+                let rows = stmt.query_map(params![&dev_eui.0 .0[..], limit as i64], |row| {
+                    let dev_eui_bytes: Vec<u8> = row.get(1)?;
+                    let dev_addr: i64 = row.get(2)?;
+                    Ok(DownlinkItem {
+                        id: row.get::<_, i64>(0)? as u64,
+                        dev_eui: DevEui(Eui64(dev_eui_bytes.try_into().map_err(|_| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                1,
+                                rusqlite::types::Type::Blob,
+                                "Invalid EUI64 length".into(),
+                            )
+                        })?)),
+                        dev_addr: DevAddr(dev_addr as u32),
+                        f_port: row.get::<_, i64>(3)? as u8,
+                        payload: row.get(4)?,
+                        confirmed: row.get::<_, i64>(5)? != 0,
+                        ack_flag: row.get::<_, i64>(6)? != 0,
+                        enqueued_at_ms: row.get(7)?,
+                        frame_counter: row.get::<_, i64>(8)? as u32,
+                    })
+                })?;
+                rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+            })
+        })
+        .await
+    }
+
+    async fn mark_transmitted(&self, id: u64) -> AppResult<()> {
+        let this = self.clone();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        this.run_blocking(move |p| {
+            p.run_with_busy_retry(|conn| {
+                let sql = schema::sql_update_downlink_status();
+                conn.execute(sql.as_str(), params!["transmitted", now, id as i64])?;
+                Ok(())
+            })
+        })
+        .await
+    }
+
+    async fn mark_failed(&self, id: u64) -> AppResult<()> {
+        let this = self.clone();
+        this.run_blocking(move |p| {
+            p.run_with_busy_retry(|conn| {
+                let sql = schema::sql_update_downlink_status();
+                conn.execute(
+                    sql.as_str(),
+                    params!["failed", rusqlite::types::Null, id as i64],
+                )?;
+                Ok(())
+            })
+        })
+        .await
+    }
+
+    async fn get_pending_for_dev(&self, dev_eui: &DevEui) -> AppResult<Vec<DownlinkItem>> {
+        self.dequeue_oldest(dev_eui, 10).await
     }
 }
 
