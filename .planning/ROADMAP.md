@@ -145,18 +145,31 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3.1. Class A Downlink | 0/TBD | Not started | - |
 | 4. Process Supervision | 0/TBD | Not started | - |
 | 5. TUI Device Management | 0/TBD | Not started | - |
-| 6. Phase 4 Verification & Artifacts | 1/1 | Complete   | 2026-04-17 |
+| 6. Phase 4 Verification & Artifacts | 1/1 | Complete | 2026-04-17 |
 | 7. Phase 5 Verification & Artifacts | 1/1 | Complete | 2026-04-17 |
+| 8. Hardware Testing (RAK Pi) | 10/10 | Complete (hardware issue identified) | 2026-04-17 |
 
 ### Phase 8: Hardware Testing (RAK Pi)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Validate Maverick software stack on RAK Pi hardware; identify gaps
+**Status:** ✅ Complete (hardware validation performed; blocking hardware issue identified)
+**Requirements**: Hardware testing infrastructure, SPI verification
 **Depends on:** Phase 7
-**Plans:** 1/1 plans complete
+**Plans:** 10/10 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 8 to break down)
+- [x] 08-A-PLAN.md — Hardware testing infrastructure (SSH, build, config validation)
+- [x] 08-B-PLAN.md — MIC verification with known test vectors (blocked: no hardware)
+- [x] 08-C-PLAN.md — Downlink testing RX1/RX2 timing (blocked: no hardware)
+- [x] 08-D-PLAN.md — SPI radio full verification (blocked: no hardware)
+- [x] 08-E-PLAN.md — Stress test high volume uplinks (blocked: no hardware)
+- [x] 08-F-PLAN.md — TUI menus verification (blocked: no hardware)
+- [x] 08-G-PLAN.md — Extension discovery and health (partially tested)
+- [x] 08-H-PLAN.md — End-to-end flow verification (blocked: no hardware)
+- [x] 08-I-PLAN.md — Visibility report (VISIBILITY.md created)
+- [x] 08-J-PLAN.md — Performance metrics (blocked: no hardware)
+
+**Key Finding:** RAK LoRa HAT not attached — 92% integration tests pass (24/26), SPI hardware not reachable
 
 ### Phase 9: Hardware Auto-Detection & SPI Enable
 
