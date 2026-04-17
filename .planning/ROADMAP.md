@@ -26,7 +26,7 @@
 
 ### 🚧 v1.1 (Next Release)
 
-- [ ] Phase 11: TBD
+- [x] Phase 11: TBD (completed 2026-04-17)
 
 ## Progress
 
@@ -43,7 +43,7 @@
 | 8. Hardware Testing (RAK Pi) | v1.0 | 10/10 | Complete | 2026-04-17 |
 | 9. Hardware Auto-Detection | v1.0 | 4/4 | Complete | 2026-04-17 |
 | 10. libloragw SPI Integration | v1.0 | 2/2 | Complete | 2026-04-17 |
-| 11. TBD | v1.1 | 0/TBD | Not started | - |
+| 11. TBD | v1.1 | 3/3 | Complete   | 2026-04-17 |
 
 ## Known Tech Debt (v1.0)
 
@@ -58,6 +58,16 @@
 ## Backlog
 
 See `.planning/milestones/v1.0-ROADMAP.md` for full v1.0 phase details.
+
+### Phase 11: Auto-update mechanism for ARM gateways
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 10
+**Plans:** 3/3 plans complete
+
+Plans:
+- [x] TBD (run /gsd-plan-phase 11 to break down) (completed 2026-04-17)
 
 ---
 
