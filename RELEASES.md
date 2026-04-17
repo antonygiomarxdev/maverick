@@ -1,51 +1,19 @@
-# Maverick v1.0.1 Release Notes
+# Maverick v1.0.2 Release Notes
 
-## What's New
+## What's New in v1.0.2
 
-### Auto-Update Mechanism
-- New `maverick-update.sh` script for automatic binary updates
-- Systemd timer (`maverick-update.timer`) checks for updates hourly
-- Support for both release (GitHub Downloads) and dev (git pull) modes
-- Atomic update with rollback backup capability
+### SPI Support in Release Binaries
+**Release binaries now include SPI support** for ARM targets (aarch64, armv7).
 
-### Configuration
-- `maverick.toml` configuration file with update settings
-- Update check interval configurable (default: 1 hour)
+The CI now cross-compiles `libloragw` (sx1302_hal) for ARM targets, so pre-built binaries work directly on SPI hardware devices (RAK Pi, etc.).
 
-## Known Limitations
+### Auto-Update Now Works for SPI Devices
+With SPI support in release binaries, the auto-update mechanism now works for all supported architectures:
+- `x86_64` - UDP only (native build)
+- `aarch64` - SPI + UDP (cross-compiled with libloragw)
+- `armv7` - SPI + UDP (cross-compiled with libloragw)
 
-### SPI/Gateway Hardware Support
-**Pre-built release binaries do NOT include SPI support** (libloragw).
-
-The release binaries (`maverick-x86_64.tar.gz`, etc.) are compiled **without** the `spi` feature because:
-1. libloragw (sx1302_hal) is not vendored in the repository
-2. Cross-compiling C libraries for ARM requires additional setup
-
-**Workaround for SPI hardware (RAK Pi, etc.):**
-```bash
-# Clone and build with SPI
-git clone https://github.com/antonygiomarxdev/maverick.git
-cd maverick
-git checkout v1.0.1
-cargo build --release --features spi -p maverick-runtime-edge
-sudo cp target/release/maverick-edge /usr/local/bin/
-```
-
-SPI support will be added to release binaries in a future version.
-
-### What's Included in Release Binaries
-- `maverick-edge` - Main LNS binary (UDP backend)
-- `maverick-edge-tui` - TUI extension
-- `install-linux.sh` - Installation script
-- `version.txt` - Version tag
-
-### What's NOT Included
-- SPI concentrator support (requires local build with `--features spi`)
-- Class A Downlink TX (deferred to v1.1)
-- SQLCipher encryption (deferred to v1.1)
-
-## Installation
-
+### Installation
 ```bash
 # Download latest release for your architecture
 curl -LO https://github.com/antonygiomarxdev/maverick/releases/latest/download/maverick-ARCH.tar.gz
@@ -53,17 +21,29 @@ tar -xzf maverick-ARCH.tar.gz
 sudo ./install-linux.sh
 ```
 
-## Upgrading from Previous Versions
+### Architecture Support
 
-```bash
-# Automatic (if update timer is enabled)
-sudo systemctl start maverick-update.service
+| Architecture | Use Case | SPI Support |
+|-------------|----------|-------------|
+| `x86_64` | Development, UDP testing | ❌ |
+| `aarch64` | RAK Pi 4, modern ARM gateways | ✅ |
+| `armv7` | RAK Pi 3, older ARM gateways | ✅ |
 
-# Manual
-sudo systemctl stop maverick-edge
-# Replace binary
-sudo systemctl start maverick-edge
-```
+## v1.0.1 → v1.0.2 Changes
+
+- ✅ CI now builds ARM targets with `--features spi`
+- ✅ `build.rs` properly handles cross-compilation sysroot
+- ✅ Auto-update works for SPI hardware devices
+
+## Known Limitations
+
+### Class A Downlink TX
+- Downlink transmission (SPI TX) deferred to v1.1
+- RX1/RX2 receive window handling requires additional work
+
+### SQLCipher Encryption
+- Session key encryption deferred to v1.1
+- Keys stored as plaintext BLOB
 
 ## Security
 
