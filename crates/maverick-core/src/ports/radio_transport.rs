@@ -19,6 +19,10 @@ pub struct UplinkObservation {
     pub wire_mic: [u8; 4],
     /// PHY payload excluding the trailing 4 MIC bytes; used by MIC verifier.
     pub phy_without_mic: Vec<u8>,
+    /// Frame control byte from FHDR; encodes FOpts length in lower 4 bits.
+    pub f_ctrl: u8,
+    /// FOpts bytes (MAC commands); empty if FOptsLen=0.
+    pub f_opts: Vec<u8>,
 }
 
 /// Downlink command to be encoded and sent by a concrete transport adapter.

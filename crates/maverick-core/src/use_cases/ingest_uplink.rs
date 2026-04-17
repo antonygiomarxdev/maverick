@@ -332,6 +332,8 @@ mod tests {
             snr: Some(5.5),
             wire_mic: mic,
             phy_without_mic: phy,
+            f_ctrl: 0,
+            f_opts: vec![],
         }
     }
 
@@ -348,6 +350,8 @@ mod tests {
             snr: Some(5.5),
             wire_mic: [0u8; 4],
             phy_without_mic: vec![],
+            f_ctrl: 0,
+            f_opts: vec![],
         }
     }
 

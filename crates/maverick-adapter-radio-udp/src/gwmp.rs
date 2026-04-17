@@ -124,7 +124,7 @@ fn rxpk_to_observation(gateway_eui: GatewayEui, rx: Rxpk) -> AppResult<UplinkObs
     let decoded = B64
         .decode(rx.data.as_bytes())
         .map_err(|e| AppError::InvalidInput(format!("gwmp rxpk data base64: {e}")))?;
-    let (dev_addr, f_cnt, f_port, payload, wire_mic, phy_without_mic) =
+    let (dev_addr, f_cnt, f_port, payload, wire_mic, phy_without_mic, f_ctrl, f_opts) =
         parse_lorawan_payload(&decoded)?;
     Ok(UplinkObservation {
         gateway_eui,
@@ -137,10 +137,12 @@ fn rxpk_to_observation(gateway_eui: GatewayEui, rx: Rxpk) -> AppResult<UplinkObs
         snr: rx.lsnr,
         wire_mic,
         phy_without_mic,
+        f_ctrl,
+        f_opts,
     })
 }
 
-type ParsedLorawanPhy = (DevAddr, u16, u8, Vec<u8>, [u8; 4], Vec<u8>);
+type ParsedLorawanPhy = (DevAddr, u16, u8, Vec<u8>, [u8; 4], Vec<u8>, u8, Vec<u8>);
 
 fn parse_lorawan_payload(raw: &[u8]) -> AppResult<ParsedLorawanPhy> {
     if raw.len() < LORAWAN_MACPAYLOAD_MIN_LEN {
@@ -186,6 +188,14 @@ fn parse_lorawan_payload(raw: &[u8]) -> AppResult<ParsedLorawanPhy> {
     } else {
         vec![]
     };
+    // Extract FOpts (bytes between FCnt and FPort)
+    let fopts_start = LORAWAN_FHDR_FCNT_END;
+    let fopts_end = fopts_start + fopts_len;
+    let f_opts = if fopts_len > 0 {
+        raw[fopts_start..fopts_end].to_vec()
+    } else {
+        vec![]
+    };
     Ok((
         dev_addr,
         fcnt_u16,
@@ -193,6 +203,8 @@ fn parse_lorawan_payload(raw: &[u8]) -> AppResult<ParsedLorawanPhy> {
         payload,
         wire_mic,
         phy_without_mic,
+        fctrl,
+        f_opts,
     ))
 }
 
