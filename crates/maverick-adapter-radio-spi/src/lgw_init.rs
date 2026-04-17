@@ -27,7 +27,7 @@ pub fn lgw_hal_start(spi_path: &str) -> AppResult<()> {
         com_path: [0; 64],
     };
     for (i, c) in spi_path.bytes().take(63).enumerate() {
-        board_conf.com_path[i] = c as i8;
+        board_conf.com_path[i] = c;
     }
     let board_ptr = &mut board_conf as *mut _;
     let ret = unsafe { lgw_bindings::lgw_board_setconf(board_ptr) };
