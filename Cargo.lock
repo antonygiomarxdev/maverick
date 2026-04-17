@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-adapter-persistence-sqlite"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "maverick-core",
@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-adapter-radio-spi"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "cc",
@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-adapter-radio-udp"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-cloud-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "maverick-extension-contracts",
@@ -541,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "aes",
  "async-trait",
@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-domain"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "serde",
  "thiserror",
@@ -564,7 +564,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-extension-contracts"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-extension-tui"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "clap",
  "maverick-core",
@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-integration-tests"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "async-trait",
  "maverick-adapter-persistence-sqlite",
@@ -600,7 +600,7 @@ dependencies = [
 
 [[package]]
 name = "maverick-runtime-edge"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "clap",
  "maverick-adapter-persistence-sqlite",
