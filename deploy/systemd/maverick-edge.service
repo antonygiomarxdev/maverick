@@ -5,7 +5,8 @@ Wants=network.target
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/maverick-edge run
+ExecStart=/usr/local/bin/maverick-edge radio ingest-loop
+Environment="MAVERICK_DATA_DIR=/var/lib/maverick"
 Restart=always
 RestartSec=2s
 WatchdogSec=30s
