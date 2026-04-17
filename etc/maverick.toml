@@ -1,6 +1,6 @@
 [update]
 mode = "release"           # "release" or "dev"
-release_url = ""            # e.g., "https://github.com/yourorg/maverick/releases"
+release_url = "https://github.com/antonygiomarxdev/maverick/releases/download" # GitHub Releases
 check_interval = 3600       # seconds between update checks
 download_dir = "/var/lib/maverick/downloads"
 backup_dir = "/var/lib/maverick/backups"

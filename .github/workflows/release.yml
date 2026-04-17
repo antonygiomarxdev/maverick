@@ -154,10 +154,42 @@ jobs:
           cp target/${{ matrix.target }}/release/maverick-edge-tui dist/maverick-edge-tui
           cp scripts/install-linux.sh dist/install-linux.sh
           chmod +x dist/maverick-edge dist/maverick-edge-tui dist/install-linux.sh
+          echo "${{ needs.prepare.outputs.version_tag }}" > dist/version.txt
           cd dist
-          tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh
+          tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh version.txt
           cd ..
           sha256sum ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ matrix.target }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.target }}.spdx.json
+
+      - name: Sign binaries with SIGSTORE
+        uses: sigstore/sigstore-github-actions/sign-blobs@main
+        with:
+          blobs: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
+          output-signatures: "${{ matrix.artifact }}.tar.gz.sig"
+        env:
+          SIGSTORE_REKOR_URL: https://rekor.sigstore.dev
+          SIGSTORE_OIDC_ISSUER: https://oauth2.sigstore.dev
+          SIGSTORE_OIDC_CLIENT_ID: sigstore
+
+      - name: Upload signatures
+        uses: actions/upload-artifact@v4
+        with:
+          name: signatures-${{ matrix.artifact }}
+          path: "*.sig"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.artifact }}
+          path: sbom-${{ matrix.target }}.spdx.json
 
       - name: Verify packaged archive contents
         shell: bash
@@ -165,7 +197,7 @@ jobs:
           set -euo pipefail
           archive="${{ matrix.artifact }}.tar.gz"
           tar -tzf "${archive}" | sort > archive.txt
-          diff -u <(printf '%s\n' install-linux.sh maverick-edge maverick-edge-tui | sort) archive.txt
+          diff -u <(printf '%s\n' install-linux.sh maverick-edge maverick-edge-tui version.txt | sort) archive.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -189,6 +221,20 @@ jobs:
         with:
           path: artifacts/
 
+      - name: Download signature artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: signature-artifacts/
+          pattern: signatures-*
+          merge-multiple: true
+
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: sbom-artifacts/
+          pattern: sbom-*
+          merge-multiple: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -198,3 +244,5 @@ jobs:
           files: |
             artifacts/**/*.tar.gz
             artifacts/**/*.sha256
+            sbom-artifacts/*.spdx.json
+            signature-artifacts/*.sig
