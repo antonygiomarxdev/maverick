@@ -30,25 +30,44 @@ The architecture is a rock-solid core surrounded by fully isolated, optional ext
 
 ### Validated
 
-- ✓ Direct SPI radio adapter (SX1302/SX1303) — gateway + LNS in one
-- ✓ UDP/GWMP ingest from packet forwarders (backward compatible)
-- ✓ SQLite persistence for sessions, uplinks, and audit events
-- ✓ ABP session management via `lns-config.toml` config load
-- ✓ Terminal operator console (TUI) as optional extension
-- ✓ Edge runtime CLI (`maverick-edge`) with hardware probe and install profiles
-- ✓ Multi-arch Linux builds (x86_64, aarch64, armv7)
-- ✓ Hexagonal architecture with port/adapter boundaries for all I/O
-- ✓ Circuit-breaker resilience for radio transport
-- ✓ Extensions as separate processes (isolated from core)
+- ✓ Direct SPI radio adapter (SX1302/SX1303) — gateway + LNS in one (Phase 2, 10)
+- ✓ UDP/GWMP ingest from packet forwarders (backward compatible) (Phase 2)
+- ✓ SQLite persistence for sessions, uplinks, and audit events (Phase 1)
+- ✓ ABP session management via `lns-config.toml` config load (Phase 1)
+- ✓ Terminal operator console (TUI) as optional extension (Phase 5)
+- ✓ Edge runtime CLI (`maverick-edge`) with hardware probe and install profiles (Phase 5)
+- ✓ Multi-arch Linux builds (x86_64, aarch64, armv7) (Phase 1)
+- ✓ Hexagonal architecture with port/adapter boundaries for all I/O (Phase 1, 2)
+- ✓ Circuit-breaker resilience for radio transport (Phase 2)
+- ✓ Extensions as separate processes (isolated from core) (Phase 5)
+- ✓ MIC verification (AES-128 CMAC) on every uplink frame (Phase 1)
+- ✓ FCnt 32-bit reconstruction from 16-bit wire value (Phase 1)
+- ✓ NwkSKey and AppSKey stored per session in SQLite (Phase 1)
+- ✓ AppSKey payload decryption (AES-128 CTR) persisted to SQLite (Phase 1)
+- ✓ Region inference for AU915 and AS923 (Phase 1)
+- ✓ Duplicate uplink detection and discard (Phase 1)
+- ✓ UDP bind address configurable, defaults to 127.0.0.1:17000 (Phase 1)
+- ✓ SQLite Mutex poison-free error handling (Phase 1)
+- ✓ Clean shutdown with WAL checkpoint (Phase 1)
+- ✓ UplinkSource port trait for radio backend abstraction (Phase 2)
+- ✓ Hardware compatibility registry (TOML) (Phase 2)
+- ✓ Radio backend selectable via config (SPI or UDP) (Phase 2)
+- ✓ Class A downlink scheduling (RX1/RX2) with LinkCheckAns (Phase 3.1)
+- ✓ Downlink queue persists to SQLite (survives restart) (Phase 3.1)
+- ✓ systemd Restart=always supervision (Phase 4)
+- ✓ Systemd watchdog for hung process detection (Phase 4)
+- ✓ Hardware probe on startup (CPU, RAM, storage, arch) (Phase 5)
+- ✓ Device list with last-seen and uplink count (Phase 5)
+- ✓ lns-config.toml import for bulk provisioning (Phase 5)
+- ✓ Autoprovision-pending device promotion via TUI (Phase 5)
 
 ### Active
 
-- [ ] MIC verification — validate LoRaWAN message integrity codes before accepting any frame
-- [ ] FCnt 32-bit support — fix 16-bit FCnt truncation that breaks sessions after 65535 uplinks
-- [ ] Extension IPC boundary — local API surface so extensions communicate with the core
-- [ ] Hardware compatibility registry — community-maintained list of tested hardware
-- [ ] Unauthenticated UDP surface hardening — restrict or bind-protect the ingest port
-- [ ] TUI device management — add/edit/remove devices through the terminal UI
+- [ ] SEC-02: NwkSKey/AppSKey SQLite encryption — domain model refactor deferred to v1.1
+- [ ] DEV-01: TUI device wizard automated tests
+- [ ] DEV-03: Direct `device remove` CLI command
+- [ ] DWNL-01..DWNL-06: Full downlink integration (SPI TX, runtime wiring)
+- [ ] RADIO-01: Full SPI RX/TX on real ARM hardware
 
 ### Out of Scope (v1)
 
@@ -86,35 +105,43 @@ The architecture is a rock-solid core surrounded by fully isolated, optional ext
 │                     maverick-edge                       │
 │                (Gateway + LNS — always up)               │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
-│  │  Radio  │  │ SQLite  │  │   CLI   │  │  IPC    │  │
+│  │  Radio  │  │ SQLite  │  │   CLI   │  │   IPC   │  │
 │  │   SPI   │  │persist  │  │   mgmt  │  │ surface │  │
 │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  │
 └─────────────────────────────────────────────────────────┘
-                              │
-                              │ (Unix pipes / TCP / HTTP local)
-                              ▼
-        ┌──────────────────┼───────────────────┬──────────┐
-        ▼                  ▼                   ▼          ▼
-  ┌──────────┐      ┌──────────┐      ┌──────────┐ ┌────────┐
-  │   TUI    │      │   HTTP    │      │   MQTT   │ │   AI   │
-  │(optional)│      │  outbound │      │  outbound│ │(optional)│
-  └──────────┘      └──────────┘      └──────────┘ └────────┘
+                               │
+                               │ (Unix pipes / TCP / HTTP local)
+                               ▼
+         ┌──────────────────┼───────────────────┬──────────┐
+         ▼                  ▼                   ▼          ▼
+   ┌──────────┐      ┌──────────┐      ┌──────────┐ ┌────────┐
+   │   TUI    │      │   HTTP    │      │   MQTT   │ │   AI   │
+   │(optional)│      │  outbound │      │  outbound│ │(optional)│
+   └──────────┘      └──────────┘      └──────────┘ └────────┘
 ```
 
 **All extensions are optional and separate processes.** The operator chooses what to install and configure.
 
 ## Context
 
-Maverick targets operators who deploy LoRaWAN sensors in locations with poor or no internet connectivity: agricultural fields, industrial sites, remote infrastructure. The stack must work entirely locally — no phone-home, no cloud dependency, no data loss when WAN is down.
+**v1.0 shipped** — 2026-04-17
 
-**Current codebase state (as of 2026-04-16):**
-- Direct SPI radio adapter exists as `maverick-adapter-radio-spi` crate
-- UDP/GWMP ingest path works end-to-end: GWMP parse → session lookup → protocol validate → SQLite persist
-- MIC verification is completely absent — any frame with a valid DevAddr and incrementing FCnt is accepted
-- FCnt is parsed as 16-bit only; sessions permanently break after 65535 uplinks
-- `DeviceRepository` and `DownlinkRepository` port traits are defined but have no adapter implementation
-- Cloud sync contracts exist but are not wired to anything
-- The TUI is a separate binary that shells out to `maverick-edge` — good isolation model
+**Current codebase state (as of 2026-04-17):**
+- Direct SPI radio adapter (`maverick-adapter-radio-spi`) with libloragw FFI bindings
+- UDP/GWMP ingest path fully functional: GWMP parse → session lookup → MIC verify → protocol validate → SQLite persist
+- MIC verification fully implemented with LoRaWAN spec test vectors
+- FCnt 32-bit support implemented — sessions survive beyond 65535 uplinks
+- NwkSKey and AppSKey stored per session, used for MIC computation and payload decryption
+- `DeviceRepository` and `DownlinkRepository` port traits with SQLite adapters
+- Class A downlink scheduler designed (RX1/RX2 timing) but not yet wired to runtime
+- TUI device management complete with wizard-based add/edit/remove
+- Systemd supervision with watchdog support
+- Hardware probe runs on startup and surfaces in TUI
+
+**v1.0 Stats:**
+- 217 files changed, 28,488 insertions, 778 deletions
+- 11 phases, 33 plans completed
+- 28,533 lines of Rust/TOML code
 
 ## Constraints
 
@@ -137,8 +164,11 @@ Maverick targets operators who deploy LoRaWAN sensors in locations with poor or 
 | Extensions are optional | No bloat; operator chooses what to install | ✅ Good |
 | Edge as source of truth | No conflicts; cloud receives, edge controls | ✅ Good |
 | Eventual sync | Works with intermittent connectivity; realtime is nice-to-have | ✅ Good |
-| MIC verification in v1 | Without it, Maverick is not a real LNS | 🔲 Pending |
-| FCnt 32-bit fix in v1 | 16-bit limit breaks devices after 65535 uplinks | 🔲 Pending |
+| MIC verification in v1 | Without it, Maverick is not a real LNS | ✅ Validated |
+| FCnt 32-bit fix in v1 | 16-bit limit breaks devices after 65535 uplinks | ✅ Validated |
+| Decimal phase numbering | Clear semantics for inserted phases | ✅ Good |
+| Class A downlink deferred | SPI TX not ready; design exists but needs wiring | ⚠️ Revisit in v1.1 |
+| SEC-02 deferred to v1.1 | Domain model refactor required before SQLCipher | 🔲 Pending |
 
 ---
 
@@ -160,4 +190,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-16*
+*Last updated: 2026-04-17 after v1.0 milestone*
