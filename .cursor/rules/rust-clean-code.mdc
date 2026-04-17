@@ -1,15 +1,43 @@
 ---
 description: Rust — clean code (functions, modules, errors, naming)
 globs: "**/*.rs"
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Rust — clean code
 
-- **Functions**: one clear responsibility; if the name needs “and”, consider splitting. Prefer early returns over deep nesting.
-- **Modules**: smallest reasonable public API (`pub use` only where it helps); hide internals in private submodules.
-- **Errors**: explicit error types (`thiserror`, failure enums); avoid generic `String` for control flow. Do not silence failures with `unwrap`/`expect` in production code except documented invariants or tests.
-- **Naming**: follow Rust conventions (`snake_case`, `UpperCamelCase`); names should express domain intent, not only type (`retain_count` over `n`).
-- **Comments**: only where “why” is non-obvious; “what” should read from the code.
-- **Duplication**: extract when two paths share business rules; do not duplicate blocks across adapters.
-- **Tests**: names describe behavior; assertions use messages or types that fail with useful context.
+## ⚠️ BEFORE WRITING CODE — ALWAYS ASK:
+- Is this KISS? (simple and readable over clever)
+- Does this follow SOLID principles?
+- Is this file too large? (> 400 lines = refactor candidate)
+
+## Functions
+- One clear responsibility; if the name needs "and", consider splitting
+- Prefer early returns over deep nesting
+- Small enough to understand at a glance
+
+## Modules
+- Smallest reasonable public API (`pub use` only where it helps)
+- Hide internals in private submodules
+- **File size: < 400 lines** — if larger, consider splitting
+
+## Errors
+- Explicit error types (`thiserror`, failure enums)
+- Avoid generic `String` for control flow
+- Do not silence failures with `unwrap`/`expect` in production code except documented invariants or tests
+
+## Naming
+- Follow Rust conventions (`snake_case`, `UpperCamelCase`)
+- Names should express domain intent, not only type (`retain_count` over `n`)
+
+## Comments
+- Only where "why" is non-obvious
+- "What" should read from the code
+
+## Duplication
+- Extract when two paths share business rules
+- Do not duplicate blocks across adapters
+
+## Tests
+- Names describe behavior
+- Assertions use messages or types that fail with useful context
