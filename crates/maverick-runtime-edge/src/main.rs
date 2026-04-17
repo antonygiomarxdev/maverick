@@ -13,6 +13,7 @@ pub mod paths;
 pub mod probe;
 pub mod radio_ingest_selection;
 pub mod runtime_capabilities;
+pub mod update;
 pub mod watchdog;
 
 use cli_constants::{
