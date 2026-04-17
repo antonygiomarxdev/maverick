@@ -4,16 +4,35 @@ fn main() {
     }
 
     let sources = [
+        "libloragw/libloragw/src/loragw_ad5338r.c",
+        "libloragw/libloragw/src/loragw_aux.c",
+        "libloragw/libloragw/src/loragw_cal.c",
+        "libloragw/libloragw/src/loragw_com.c",
+        "libloragw/libloragw/src/loragw_debug.c",
+        "libloragw/libloragw/src/loragw_gps.c",
         "libloragw/libloragw/src/loragw_hal.c",
-        "libloragw/libloragw/src/loragw_spi.c",
+        "libloragw/libloragw/src/loragw_i2c.c",
+        "libloragw/libloragw/src/loragw_lbt.c",
+        "libloragw/libloragw/src/loragw_mcu.c",
         "libloragw/libloragw/src/loragw_reg.c",
+        "libloragw/libloragw/src/loragw_spi.c",
+        "libloragw/libloragw/src/loragw_stts751.c",
+        "libloragw/libloragw/src/loragw_sx1250.c",
+        "libloragw/libloragw/src/loragw_sx125x.c",
+        "libloragw/libloragw/src/loragw_sx1261.c",
         "libloragw/libloragw/src/loragw_sx1302.c",
         "libloragw/libloragw/src/loragw_sx1302_rx.c",
         "libloragw/libloragw/src/loragw_sx1302_timestamp.c",
-        "libloragw/libloragw/src/loragw_sx125x.c",
-        "libloragw/libloragw/src/loragw_sx1250.c",
-        "libloragw/libloragw/src/loragw_aux.c",
-        "libloragw/libloragw/src/loragw_com.c",
+        "libloragw/libloragw/src/loragw_usb.c",
+        "libloragw/libloragw/src/sx1250_com.c",
+        "libloragw/libloragw/src/sx1250_spi.c",
+        "libloragw/libloragw/src/sx1250_usb.c",
+        "libloragw/libloragw/src/sx125x_com.c",
+        "libloragw/libloragw/src/sx125x_spi.c",
+        "libloragw/libloragw/src/sx1261_com.c",
+        "libloragw/libloragw/src/sx1261_spi.c",
+        "libloragw/libloragw/src/sx1261_usb.c",
+        "libloragw/libtools/src/tinymt32.c",
     ];
 
     let mut build = cc::Build::new();
@@ -22,6 +41,7 @@ fn main() {
     }
     build
         .include("libloragw/libloragw/inc")
+        .include("libloragw/libtools/inc")
         .flag("-Wno-unused-parameter")
         .flag("-Wno-sign-compare");
 
