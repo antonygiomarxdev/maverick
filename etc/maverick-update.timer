@@ -1,0 +1,11 @@
+[Unit]
+Description=Maverick Update Timer
+Requires=maverick-update.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
