@@ -1,0 +1,3 @@
+[submodule "crates/maverick-adapter-radio-spi/libloragw"]
+	path = crates/maverick-adapter-radio-spi/libloragw
+	url = https://github.com/lora-net/sx1302_hal.git
