@@ -167,24 +167,6 @@ jobs:
           format: spdx-json
           output-file: sbom-${{ matrix.target }}.spdx.json
 
-      - name: Sign binaries with SIGSTORE
-        uses: sigstore/sigstore-github-actions/sign-blobs@main
-        with:
-          blobs: |
-            ${{ matrix.artifact }}.tar.gz
-            ${{ matrix.artifact }}.tar.gz.sha256
-          output-signatures: "${{ matrix.artifact }}.tar.gz.sig"
-        env:
-          SIGSTORE_REKOR_URL: https://rekor.sigstore.dev
-          SIGSTORE_OIDC_ISSUER: https://oauth2.sigstore.dev
-          SIGSTORE_OIDC_CLIENT_ID: sigstore
-
-      - name: Upload signatures
-        uses: actions/upload-artifact@v4
-        with:
-          name: signatures-${{ matrix.artifact }}
-          path: "*.sig"
-
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
