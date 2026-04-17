@@ -218,7 +218,7 @@ impl SqlitePersistence {
     pub fn lns_show_device(&self, dev_eui_hex: &str) -> AppResult<Option<LnsDeviceShowRow>> {
         self.run_with_busy_retry(|conn| {
             let dev_eui_b = parse_hex_dev_eui(dev_eui_hex)
-                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?;
+                .map_err(rusqlite::Error::InvalidParameterName)?;
             let mut stmt = conn.prepare(
                 "SELECT d.dev_eui, d.dev_addr, d.activation_mode, d.application_id, d.region, d.enabled,
                         s.updated_at_ms,

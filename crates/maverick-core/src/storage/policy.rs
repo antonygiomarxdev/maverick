@@ -44,6 +44,7 @@ pub struct StoragePolicy {
     pub max_records_critical: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for StoragePolicy {
     fn default() -> Self {
         HybridRetentionDefaults::balanced().into_policy(true)
