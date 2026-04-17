@@ -1,0 +1,7 @@
+[update]
+mode = "release"           # "release" or "dev"
+release_url = ""            # e.g., "https://github.com/yourorg/maverick/releases"
+check_interval = 3600       # seconds between update checks
+download_dir = "/var/lib/maverick/downloads"
+backup_dir = "/var/lib/maverick/backups"
+insecure = false            # allow HTTP (not recommended)
