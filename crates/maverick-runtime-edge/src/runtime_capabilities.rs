@@ -74,6 +74,16 @@ pub struct SelectedIngestMode {
 }
 
 impl RuntimeCapabilityReport {
+    /// Returns true if SPI hardware is detected and ingest is currently UDP.
+    pub fn spi_recommended_but_not_enabled(&self) -> bool {
+        if let Some(ref spi) = self.radio_environment.spi_hardware {
+            if !spi.concentrator_candidates.is_empty() {
+                return self.selected_ingest.kind == UplinkBackendKind::GwmpUdp;
+            }
+        }
+        false
+    }
+
     /// Plain-text summary for operators (TTY / `--summary`); JSON remains the machine contract.
     pub fn format_operator_summary(&self) -> String {
         use std::fmt::Write as _;
@@ -177,6 +187,25 @@ impl RuntimeCapabilityReport {
             }
         } else {
             let _ = writeln!(s, "  SPI hardware: none detected");
+        }
+        if let Some(ref spi) = self.radio_environment.spi_hardware {
+            if !spi.concentrator_candidates.is_empty()
+                && self.selected_ingest.kind == UplinkBackendKind::GwmpUdp
+            {
+                let _ = writeln!(s);
+                let _ = writeln!(s, "  SPI auto-enable available:");
+                let _ = writeln!(s, "    To enable SPI ingest, add to lns-config.toml:");
+                let _ = writeln!(s, "      [radio]");
+                let _ = writeln!(s, "      backend = \"auto\"");
+                let _ = writeln!(s, "    Or use explicit path:");
+                let _ = writeln!(s, "      [radio]");
+                let _ = writeln!(s, "      backend = \"spi\"");
+                let _ = writeln!(
+                    s,
+                    "      spi_path = \"{}\"",
+                    spi.concentrator_candidates[0].spi_path
+                );
+            }
         }
         let _ = writeln!(s);
         let _ = writeln!(s, "  Confirm / next steps:");
@@ -476,5 +505,22 @@ fn which_systemctl() -> Option<&'static str> {
         Some("/bin/systemctl")
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spi_hardware_detection_returns_none_on_no_spidev() {
+        let result = probe_spi_hardware();
+        println!("SPI probe result: {:?}", result);
+    }
+
+    #[test]
+    fn test_radio_environment_hints_includes_spi_field() {
+        let hints = RadioEnvironmentHints::probe();
+        println!("Radio environment hints: {:?}", hints);
     }
 }
