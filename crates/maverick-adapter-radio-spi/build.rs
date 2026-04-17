@@ -23,8 +23,55 @@ fn main() {
     build
         .include("libloragw/libloragw/inc")
         .flag("-Wno-unused-parameter")
-        .flag("-Wno-sign-compare")
-        .compile("loragw");
+        .flag("-Wno-sign-compare");
+
+    // Detect cross-compilation target
+    let target = std::env::var("CARGO_BUILD_TARGET").ok();
+
+    // Check CFLAGS_* env vars for --sysroot (set by release.yml cross-compilation setup)
+    // These are the primary mechanism since release.yml sets CFLAGS_aarch64_* and CFLAGS_armv7_*
+    if let Some(cflags) = std::env::var("CFLAGS").ok() {
+        for part in cflags.split_whitespace() {
+            if part.starts_with("--sysroot=") {
+                build.flag(part);
+            }
+        }
+    }
+
+    // Check target-specific CFLAGS (release.yml sets these for ARM cross-compilation)
+    if let Some(cflags) = std::env::var("CFLAGS_aarch64_unknown_linux_gnu").ok() {
+        for part in cflags.split_whitespace() {
+            if part.starts_with("--sysroot=") {
+                build.flag(part);
+            }
+        }
+    }
+    if let Some(cflags) = std::env::var("CFLAGS_armv7_unknown_linux_gnueabihf").ok() {
+        for part in cflags.split_whitespace() {
+            if part.starts_with("--sysroot=") {
+                build.flag(part);
+            }
+        }
+    }
+
+    // Also detect via CARGO_BUILD_TARGET for direct sysroot flag usage
+    if let Some(ref t) = target {
+        if t.contains("aarch64") {
+            if let Ok(sysroot) = std::env::var("AARCH64_UNKNOWN_LINUX_GNU_SYSROOT")
+                .or_else(|_| std::env::var("SYSROOT_AARCH64"))
+            {
+                build.flag(&format!("--sysroot={}", sysroot));
+            }
+        } else if t.contains("armv7") {
+            if let Ok(sysroot) = std::env::var("ARV7_UNKNOWN_LINUX_GNUEABIHF_SYSROOT")
+                .or_else(|_| std::env::var("SYSROOT_ARMV7"))
+            {
+                build.flag(&format!("--sysroot={}", sysroot));
+            }
+        }
+    }
+
+    build.compile("loragw");
 
     println!("cargo:rustc-link-lib=m");
     println!("cargo:rustc-link-lib=rt");
