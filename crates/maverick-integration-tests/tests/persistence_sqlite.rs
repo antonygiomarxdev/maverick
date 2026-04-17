@@ -112,6 +112,8 @@ async fn ingest_uplink_persists_via_sqlite_adapter() {
         snr: None,
         wire_mic: mic,
         phy_without_mic: phy,
+        f_ctrl: 0,
+        f_opts: vec![],
     };
     svc.execute(obs).await.expect("ingest");
 

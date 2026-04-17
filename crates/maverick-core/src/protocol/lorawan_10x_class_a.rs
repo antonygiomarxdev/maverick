@@ -123,6 +123,8 @@ mod tests {
             snr: None,
             wire_mic: [0u8; 4],
             phy_without_mic: vec![],
+            f_ctrl: 0,
+            f_opts: vec![],
         }
     }
 
