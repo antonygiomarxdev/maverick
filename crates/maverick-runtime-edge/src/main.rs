@@ -121,6 +121,11 @@ enum ConfigCmd {
         #[arg(long)]
         dev_addr: String,
     },
+    /// Show detailed info for a single device (JSON)
+    ShowDevice {
+        #[arg(long)]
+        dev_eui: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -241,6 +246,9 @@ async fn main() {
             ),
             ConfigCmd::RejectDevice { dev_addr } => {
                 config::run_config_reject_device(cli.data_dir, db_file, dev_addr)
+            }
+            ConfigCmd::ShowDevice { dev_eui } => {
+                config::run_config_show_device(cli.data_dir, db_file, dev_eui)
             }
         },
     }

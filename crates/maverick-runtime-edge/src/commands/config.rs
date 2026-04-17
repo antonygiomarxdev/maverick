@@ -321,3 +321,33 @@ pub(crate) fn run_config_reject_device(data_dir: PathBuf, db_file: &str, dev_add
         }
     }
 }
+
+pub(crate) fn run_config_show_device(data_dir: PathBuf, db_file: &str, dev_eui: String) {
+    let dbp = db_path(&data_dir, db_file);
+    if !dbp.exists() {
+        eprintln!("database not found.");
+        std::process::exit(1);
+    }
+    let cap = HardwareCapabilities::probe();
+    let policy = cap.suggested_install_profile().default_storage_policy();
+    let store = match SqlitePersistence::open(&dbp, policy, sqlite_opts()) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("storage open failed: {e}");
+            std::process::exit(1);
+        }
+    };
+    match store.lns_show_device(&dev_eui) {
+        Ok(Some(device)) => {
+            print_json(&device);
+        }
+        Ok(None) => {
+            eprintln!("device not found: {dev_eui}");
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("show device failed: {e}");
+            std::process::exit(1);
+        }
+    }
+}
