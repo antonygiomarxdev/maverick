@@ -69,6 +69,16 @@ See `.planning/milestones/v1.0-ROADMAP.md` for full v1.0 phase details.
 Plans:
 - [x] TBD (run /gsd-plan-phase 11 to break down) (completed 2026-04-17)
 
+### Phase 12: Release CI hardening and update URL configuration
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 11
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] TBD (run /gsd-plan-phase 12 to break down) (completed 2026-04-17)
+
 ---
 
 *Roadmap reorganized: 2026-04-17 after v1.0 milestone completion*
