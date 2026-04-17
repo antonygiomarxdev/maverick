@@ -8,7 +8,8 @@ BACKUP_DIR="/var/lib/maverick/backups"
 DOWNLOAD_DIR="/var/lib/maverick/downloads"
 CONFIG_DIR="/etc/maverick"
 
-$LOG "Starting update check"
+log() { echo "$@" | $LOG; }
+log "Starting update check"
 
 # Load config
 if [ -f "$CONFIG_DIR/maverick.toml" ]; then
@@ -24,7 +25,7 @@ fi
 # Get current version
 CURRENT_VERSION=$(/usr/local/bin/maverick-edge --version 2>/dev/null | awk '{print $2}' || echo "unknown")
 
-$LOG "Current version: $CURRENT_VERSION, mode: $UPDATE_MODE"
+log "Current version: $CURRENT_VERSION, mode: $UPDATE_MODE"
 
 # Stop maverick-edge service
 systemctl stop maverick-edge.service
@@ -38,7 +39,7 @@ if [ "$UPDATE_MODE" = "release" ] && [ -n "$RELEASE_URL" ]; then
   # Check version
   NEW_VERSION=$(curl -sf "$VERSION_URL" || echo "")
   if [ -n "$NEW_VERSION" ] && [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
-    $LOG "New version available: $NEW_VERSION"
+    log "New version available: $NEW_VERSION"
     # Download new binary
     mkdir -p "$DOWNLOAD_DIR"
     curl -sf "$RELEASE_URL/$ARCH/maverick-edge-$NEW_VERSION" -o "$DOWNLOAD_DIR/maverick-edge-$NEW_VERSION"
@@ -49,9 +50,9 @@ if [ "$UPDATE_MODE" = "release" ] && [ -n "$RELEASE_URL" ]; then
     mv "$DOWNLOAD_DIR/maverick-edge-$NEW_VERSION" "$BINARY_PATH.new"
     mv "$BINARY_PATH.new" "$BINARY_PATH"
     chmod 755 "$BINARY_PATH"
-    $LOG "Binary updated to $NEW_VERSION"
+    log "Binary updated to $NEW_VERSION"
   else
-    $LOG "No new version available"
+    log "No new version available"
   fi
 fi
 
@@ -66,11 +67,11 @@ if [ "$UPDATE_MODE" = "dev" ]; then
       cp "$BINARY_PATH" "$BACKUP_DIR/maverick-edge-dev-$(date +%s)"
       cp target/release/maverick-edge "$BINARY_PATH"
       chmod 755 "$BINARY_PATH"
-      $LOG "Dev build updated"
+      log "Dev build updated"
     fi
   fi
 fi
 
 # Start maverick-edge service
 systemctl start maverick-edge.service
-$LOG "Update complete"
+log "Update complete"
