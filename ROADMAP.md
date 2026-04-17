@@ -1,86 +1,173 @@
-# Maverick Roadmap (Focus Reset)
+# Maverick Roadmap
 
-Date: 2026-04-10
+Date: 2026-04-16
 Status: Active — **public beta** (`0.x` SemVer tags; see [`docs/release-policy.md`](docs/release-policy.md))
 
 ## North Star
 
-Deliver a runtime-first, offline-first edge LNS that is reliable in remote environments and does not depend on cloud availability.
+**LoRaWAN. Offline. Always.**
 
-## Rules of execution
+A self-contained LoRaWAN gateway + network server that runs where nothing else does. Your data never dies.
 
-1. Single-track only (`WIP = 1`).
-2. Critical KPIs never regress:
-   - edge reliability,
-   - architecture integrity.
-3. Stop-the-line if a critical KPI regresses.
-4. Test coverage is a release gate, not a post-delivery task.
+## Principles
 
-## Now / Next / Later
+1. **Reliability above all** — The LNS core never falls, never loses data, never blocks.
+2. **Zero cloud dependency** — All persistence is local. Zero calls to external services.
+3. **Everything is optional** — TUI, dashboard, HTTP, MQTT, AI — operator chooses.
+4. **Extension isolation** — Extensions are separate processes. Core never affected.
+5. **Community-driven** — Opensource. Contributions welcome everywhere.
+6. **AI-compatible** — Door open for AI extensions when hardware allows.
 
-## Now (only active work)
+## v1 Milestone: Functional LNS-Gateway
 
-### Slice 0 - Architecture lock
+**Goal:** Ship a complete, reliable, self-contained LoRaWAN stack.
 
-1. Freeze core/adapters/runtime boundaries.
-2. Lock protocol capability-module strategy.
-3. Lock install-time profile contract.
-4. Lock extension contract compatibility policy.
-5. Execute Sprint 1 plan in `docs/04-sprint-1-executable-plan.md`.
+---
 
-Exit evidence:
+## Phase 01: Protocol Correctness
+**Status:** ✅ Complete (partial)
 
-1. Boundary rules documented and testable.
-2. Core compiles without concrete infra dependencies.
-3. Reliability and boundary acceptance criteria are explicit.
-4. Slice 0 includes test strategy and required test layers for all upcoming slices.
+LoRaWAN 1.0.x protocol implementation.
 
-## Next (queued, not active)
+**Incomplete:**
+- MIC verification — pending
+- FCnt 32-bit support — pending
 
-### Slice 1 - Core minimum complete LNS
+These are security-critical and will be addressed in Phase 03.
 
-1. LoRaWAN 1.0.x Class A core behavior.
-2. Region policy baseline (EU868, US915, AU915, AS923, EU433).
-3. Typed invariants and policy tests.
+## Phase 02: Radio Abstraction & SPI
+**Status:** ✅ Complete
 
-### Slice 2 - Durable persistence and storage policy
+Direct SPI radio adapter for SX1302/SX1303.
+Gateway + LNS in one device.
 
-1. Durable local persistence by default.
-2. Hybrid retention policy (tiered + circular continuity under pressure).
-3. Install-time profile presets for constrained and larger hardware.
+## Phase 03: Protocol Security
+**Status:** 🔲 Next
 
-## Later (frozen backlog)
+MIC verification and FCnt 32-bit support.
 
-### Slice 3 - Adapter isolation and transport integration
+**Why:** Without MIC, any node can inject fake data. Without FCnt 32-bit, sessions break after 65535 uplinks.
 
-1. First transport adapter behind contract.
-2. Optional management adapter.
-3. Isolation guarantees (bounded queues, timeout, backoff, circuit break at boundaries).
+**Goals:**
+- MIC verification — validate every uplink before accepting
+- FCnt 32-bit — support full 32-bit frame counter
+- FRMPayload decryption — AES-128 decript in end-device mode
 
-### Slice 4 - Field visibility baseline
+**Exit criteria:**
+- [ ] MIC verification passes for valid frames
+- [ ] MIC verification rejects forged frames
+- [ ] FCnt 32-bit works across rollover boundary
+- [ ] Protocol state machine handles all edge cases
 
-1. Mandatory local CLI (`status`, `health`, `recent-errors`).
-2. Mandatory local structured rotating logs.
-3. Optional diagnostics snapshot export.
+## Phase 04: Class A Downlink
+**Status:** 🔲 Queued
 
-### Slice 5 - Sync-ready contracts (post-v1 runtime)
+Bidirectional LoRaWAN communication.
 
-1. Future sync contracts and envelope compatibility.
-2. Keep v1 runtime cloud-independent.
+**Goals:**
+- Downlink TX window timing (RX1, RX2)
+- Downlink scheduling and queue management
+- DeviceRepository port implementation
+- DownlinkRepository port implementation
 
-### Slice 6 - Developer-friendly extensibility
+**Exit criteria:**
+- [ ] Can send downlink to device after uplink
+- [ ] RX1/RX2 timing correct per region
+- [ ] Downlink queue persists across restarts
 
-1. Versioned extension contracts.
-2. Adapter templates and integration guidance.
-3. Hybrid SemVer deprecation/compatibility window in practice.
+## Phase 05: Extension IPC
+**Status:** 🔲 Queued
 
-## Method
+Local API surface for extensions.
 
-Use the operating model defined in `docs/03-operating-model.md`.
+**Why:** Community needs a defined interface to build extensions without coupling to core.
 
-## Authoritative references
+**Goals:**
+- Define extension IPC protocol
+- Implement core-side listener (HTTP, Unix socket, or similar)
+- Document extension contract
+- Create example extension template
 
-1. `docs/00-product-intent.md`
-2. `docs/01-execution-plan.md`
-3. `docs/02-delivery-checklist.md`
-4. `docs/03-operating-model.md`
+**Exit criteria:**
+- [ ] Extensions can communicate with core via IPC
+- [ ] Extension contracts documented
+- [ ] Example/template extension available
+
+## Phase 06: Process Supervision
+**Status:** 🔲 Queued
+
+Auto-restart, self-healing, reliability.
+
+**Goals:**
+- Core process supervised (auto-restart on crash)
+- Extension process monitoring
+- Health checks and status reporting
+- Graceful shutdown handling
+
+**Exit criteria:**
+- [ ] Core restarts automatically on crash
+- [ ] Extension failures don't affect core
+- [ ] `maverick-edge health` reports accurate status
+
+## Phase 07: Community-Ready
+**Status:** 🔲 Queued
+
+Prepare for v1.0 release.
+
+**Goals:**
+- Hardware compatibility registry
+- Extension templates and documentation
+- Contributor guide
+- Release artifacts for all targets
+
+**Exit criteria:**
+- [ ] Hardware registry documents tested configurations
+- [ ] Extension SDK/template available
+- [ ] CONTRIBUTING.md complete
+- [ ] v0.1.0 or v1.0.0 release tagged
+
+---
+
+## Post-v1 (Backlog)
+
+### Maverick Cloud Sync
+- Edge pushes to cloud when connectivity available
+- MQTT or HTTPS with queue
+- Eventual consistency model
+
+### Extensions (Official)
+- `maverick-tui` — terminal console
+- `maverick-dashboard` — web UI
+- `maverick-http` — HTTP webhooks
+- `maverick-mqtt` — MQTT integration
+- `maverick-ai` — AI analytics (API-based)
+
+### OTAA Join
+- Over-The-Air activation support
+- Deferred to v2
+
+### Multi-Region
+- Full region support beyond EU868
+
+---
+
+## Quality Gates
+
+Before closing each phase, verify:
+- [ ] Code follows Rust clean code standards
+- [ ] Hexagonal architecture maintained
+- [ ] `cargo fmt` + `cargo clippy` pass
+- [ ] No cloud dependencies in core
+- [ ] Extensions remain isolated
+
+See: `.planning/QUALITY-CHECKLIST.md`
+
+---
+
+## Authoritative References
+
+- [`VISION.md`](VISION.md) — Project vision and principles
+- [`.planning/QUALITY-CHECKLIST.md`](.planning/QUALITY-CHECKLIST.md) — Quality standards
+- [`docs/00-product-intent.md`](docs/00-product-intent.md)
+- [`docs/01-execution-plan.md`](docs/01-execution-plan.md)
+- [`docs/03-operating-model.md`](docs/03-operating-model.md)

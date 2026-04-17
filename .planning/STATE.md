@@ -3,88 +3,62 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 02 complete (all plans); Phase 03 not yet planned
+stopped_at: Phase 03 not yet planned
 last_updated: "2026-04-16"
-last_activity: 2026-04-16 -- Phase 02: SPI crate + `--features spi` + radio resolve
+last_activity: 2026-04-16 -- Roadmap reorganized, vision documented, quality checklist added
 progress:
-  total_phases: 5
+  total_phases: 7
   completed_phases: 2
   total_plans: 10
   completed_plans: 10
-  percent: 40
+  percent: 28
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-16)
+- [`VISION.md`](../VISION.md) — Project vision: "LoRaWAN. Offline. Always."
+- [`.planning/QUALITY-CHECKLIST.md`](../QUALITY-CHECKLIST.md) — Quality standards
+- [`.planning/PROJECT.md`](../PROJECT.md) — Full project context
 
-**Core value:** Never lose a LoRaWAN uplink — from radio to SQLite, data is preserved regardless of internet connectivity, extension state, or process restarts.
-**Current focus:** Phase 03 — Class A Downlink (not planned yet)
+**Core value:** Your LoRaWAN data never dies — from radio to SQLite, preserved regardless of connectivity or failures.
+
+**Current focus:** Phase 03 — Protocol Security (MIC + FCnt 32-bit)
 
 ## Current Position
 
-Phase: 02 (Radio Abstraction & SPI) — COMPLETE (libloragw RX still placeholder)
-Plan: 4 of 4 executed
-Status: Plan Phase 3 (Class A Downlink) or wire libloragw RX
-Last activity: 2026-04-16 -- Phase 02 closed out in repo
+Phase: 02 (Radio Abstraction & SPI) — COMPLETE
+Next: Phase 03 (Protocol Security) — NOT PLANNED
 
-Progress: [████░░░░░░] 40% (2/5 phases done at roadmap level)
+**v1 milestone progress:** [██░░░░░░░░] 28% (2/7 phases)
 
-## Performance Metrics
+## v1 Phases
 
-**Velocity:**
+| Phase | Name | Status |
+|-------|------|--------|
+| 01 | Protocol Correctness | ✅ Complete (partial - MIC/FCnt deferred) |
+| 02 | Radio Abstraction & SPI | ✅ Complete |
+| 03 | Protocol Security | 🔲 Next |
+| 04 | Class A Downlink | 🔲 Queued |
+| 05 | Extension IPC | 🔲 Queued |
+| 06 | Process Supervision | 🔲 Queued |
+| 07 | Community-Ready | 🔲 Queued |
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+## Decisions
 
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: none yet
-- Trend: -
-
-*Updated after each plan completion*
-
-## Accumulated Context
-
-### Decisions
-
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- [Pre-Phase 1]: MIC + FCnt must land together — MIC B0 block requires 32-bit FCnt; single atomic change
-- [Pre-Phase 1]: NwkSKey stored in SessionSnapshot (not separate key-fetch port) — gates MIC implementation
-- [Pre-Phase 1]: RELI-01 (Mutex poison) + RELI-02 (process::exit) must ship in Phase 1 before supervision is meaningful
-- [Pre-Phase 2]: UplinkSource port trait must exist before SPI adapter can be implemented
-- [Pre-Phase 3]: Downlink depends on correct protocol (Phase 1) being in place
-
-### Pending Todos
-
-None yet.
-
-### Blockers/Concerns
-
-- [Research open question]: UDP bind default — 127.0.0.1 breaks external packet forwarders; decide opt-in vs default before Phase 1 ships
-- [Research open question]: libloragw cross-compilation from x86_64 — validate CI sysroot headers before committing to Phase 2 SPI work
-
-## Deferred Items
-
-| Category | Item | Status | Deferred At |
-|----------|------|--------|-------------|
-| Extension IPC | EXT-01/02/03 local HTTP API + SSE | v2 | Roadmap creation |
-| OTAA | OTAA-01/02 join handling | v2 | Roadmap creation |
-| Output plugins | OUT-01/02/03 HTTP/MQTT/cloud sync | v2 | Roadmap creation |
+- [Phase 01]: MIC + FCnt must land together — MIC B0 block requires 32-bit FCnt
+- [Phase 01]: NwkSKey stored in SessionSnapshot — gates MIC implementation
+- [Phase 02]: UplinkSource port trait enables SPI adapter
+- [Phase 03]: Downlink depends on correct protocol — MIC + FCnt must be done first
 
 ## Session Continuity
 
-Last session: 2026-04-16 (resumed)
-Stopped at: Phase 02 done — next `/gsd-plan-phase 3` (or libloragw follow-up)
-Resume file: None
+Last session: 2026-04-16
+Stopped at: Roadmap reorganized, ready to plan Phase 03
+Next: `/gsd-discuss-phase 3` or `/gsd-plan-phase 3`
+
+## Notes
+
+Quality checklist added to `.planning/QUALITY-CHECKLIST.md` — verify before closing each phase.
+Vision documented in `VISION.md` — "LoRaWAN. Offline. Always."
