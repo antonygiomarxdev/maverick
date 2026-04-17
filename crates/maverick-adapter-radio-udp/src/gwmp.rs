@@ -1,3 +1,15 @@
+//! ## SPI Adapter — UplinkObservation Parsing Contract
+//!
+//! When integrating libloragw RX (lgw_receive), the SPI adapter MUST:
+//!
+//! 1. Extract `wire_mic = phy_payload[phy_payload.len()-4..]` (last 4 bytes)
+//! 2. Extract `phy_without_mic = &phy_payload[..phy_payload.len()-4]`
+//! 3. Extract DevAddr, FCnt, FPort, payload per LoRaWAN 1.0.x PHY format
+//! 4. Pass ALL of the above to UplinkObservation
+//!
+//! Without `wire_mic` and `phy_without_mic`, MIC verification in IngestUplink
+//! will receive zeros and ALL valid frames will be rejected.
+
 //! Semtech GWMP PUSH_DATA parsing into core `UplinkObservation`.
 
 use base64::engine::general_purpose::STANDARD as B64;
@@ -265,5 +277,142 @@ mod tests {
             r#"{"rxpk":[{"freq":903.9,"rssi":-70,"lsnr":6.0,"data":"QAECAwQEAAEByv66vg=="}]}"#;
         let batch = parse_push_data_json(gw, 2, body).expect("batch");
         assert_eq!(batch.observations[0].region, RegionId::Us915);
+    }
+
+    // ========================================================================
+    // UDP adapter MIC extraction integration tests
+    // ========================================================================
+    // These tests verify that parse_lorawan_payload correctly extracts:
+    // - wire_mic: last 4 bytes of raw PHY payload
+    // - phy_without_mic: raw[..len-4] for MIC computation in ingest
+    // - DevAddr, FCnt, FPort, payload fields
+
+    /// Construct a known LoRaWAN 1.0.x uplink frame and verify MIC extraction.
+    /// MHDR (1 byte): MType=0b_010_00_00 (unconfirmed uplink), Major=00
+    #[test]
+    fn full_pipeline_valid_frame_with_mic() {
+        // Manual LoRaWAN 1.0.x uplink frame construction:
+        // MHDR: 0x40 (unconfirmed uplink, major=00)
+        // DevAddr: 0x04_03_02_01 (LE = 0x01, 0x02, 0x03, 0x04)
+        // FCtrl: 0x00 (no FOpts, ADR=0, ACK=0, RFU=0)
+        // FCnt: 0x00_01 (LE = 0x01, 0x00)
+        // FPort: 0x01
+        // FRMPayload: 0xAA, 0xBB, 0xCC (3 bytes)
+        // MIC: computed from B0 || PHY_without_MIC
+        let raw = vec![
+            0x40, // MHDR
+            0x01, 0x02, 0x03, 0x04, // DevAddr (LE)
+            0x00, // FCtrl
+            0x01, 0x00, // FCnt = 1 (LE)
+            0x01, // FPort
+            0xAA, 0xBB, 0xCC, // FRMPayload
+            0x00, 0x00, 0x00, 0x00, // MIC (placeholder)
+        ];
+        let base64_frame = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &raw);
+
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = format!(
+            r#"{{"rxpk":[{{"freq":868.1,"rssi":-57,"lsnr":5.2,"data":"{}"}}]}}"#,
+            base64_frame
+        );
+        let batch = parse_push_data_json(gw, 2, &body).expect("batch");
+
+        assert_eq!(batch.observations.len(), 1);
+        let obs = &batch.observations[0];
+
+        // Verify DevAddr extracted correctly
+        assert_eq!(obs.dev_addr.0, 0x0403_0201);
+
+        // Verify FCnt wire value
+        assert_eq!(obs.f_cnt, 0x0001);
+
+        // Verify FPort
+        assert_eq!(obs.f_port, 0x01);
+
+        // Verify payload
+        assert_eq!(obs.payload, vec![0xAA, 0xBB, 0xCC]);
+
+        // Verify wire_mic is last 4 bytes
+        assert_eq!(obs.wire_mic, [0x00, 0x00, 0x00, 0x00]);
+
+        // Verify phy_without_mic has correct length (raw.len() - 4 = 11 - 4 = 7)
+        assert_eq!(
+            obs.phy_without_mic.len(),
+            raw.len() - 4,
+            "phy_without_mic.len() must equal raw.len() - 4"
+        );
+    }
+
+    /// Verify wire_mic equals exact last 4 bytes and phy_without_mic excludes MIC.
+    #[test]
+    fn mic_extraction_from_known_frame() {
+        // Construct a frame where we know the last 4 bytes
+        let known_mic = [0xDE, 0xAD, 0xBE, 0xEF];
+        let raw = vec![
+            0x40, // MHDR
+            0x01,
+            0x02,
+            0x03,
+            0x04, // DevAddr
+            0x00, // FCtrl
+            0x01,
+            0x00, // FCnt
+            0x01, // FPort
+            0xAA,
+            0xBB, // FRMPayload (2 bytes)
+            known_mic[0],
+            known_mic[1],
+            known_mic[2],
+            known_mic[3], // MIC
+        ];
+        let base64_frame = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &raw);
+
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = format!(
+            r#"{{"rxpk":[{{"freq":868.1,"rssi":-57,"lsnr":5.2,"data":"{}"}}]}}"#,
+            base64_frame
+        );
+        let batch = parse_push_data_json(gw, 2, &body).expect("batch");
+
+        assert_eq!(batch.observations[0].wire_mic, known_mic);
+
+        // Verify phy_without_mic does NOT contain MIC bytes
+        assert!(
+            !batch.observations[0].phy_without_mic.ends_with(&known_mic),
+            "phy_without_mic must not contain MIC bytes"
+        );
+    }
+
+    /// Verify `phy_without_mic.len() == raw.len() - 4` for a frame with MIC.
+    #[test]
+    fn phy_without_mic_correct_length() {
+        // Frame with known length
+        let raw = vec![
+            0x40, // MHDR
+            0x01, 0x02, 0x03, 0x04, // DevAddr
+            0x00, // FCtrl
+            0x01, 0x00, // FCnt
+            0x01, // FPort
+            0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, // FRMPayload (6 bytes)
+            0x11, 0x22, 0x33, 0x44, // MIC (4 bytes)
+        ];
+        // Total: 1 + 4 + 1 + 2 + 1 + 6 + 4 = 19 bytes
+        assert_eq!(raw.len(), 19);
+
+        let base64_frame = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &raw);
+
+        let gw = GatewayEui(Eui64([1; 8]));
+        let body = format!(
+            r#"{{"rxpk":[{{"freq":868.1,"rssi":-57,"lsnr":5.2,"data":"{}"}}]}}"#,
+            base64_frame
+        );
+        let batch = parse_push_data_json(gw, 2, &body).expect("batch");
+
+        let obs = &batch.observations[0];
+        assert_eq!(
+            obs.phy_without_mic.len(),
+            15,
+            "phy_without_mic.len() must be 19 - 4 = 15"
+        );
     }
 }
