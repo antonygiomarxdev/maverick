@@ -158,19 +158,31 @@ impl SqlitePersistence {
     pub fn lns_list_devices(&self) -> AppResult<Vec<LnsDeviceListRow>> {
         self.run_with_busy_retry(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT dev_eui, dev_addr, activation_mode, application_id, region, enabled FROM lns_devices ORDER BY application_id, dev_eui",
+                "SELECT d.dev_eui, d.dev_addr, d.activation_mode, d.application_id, d.region, d.enabled,
+                        s.updated_at_ms,
+                        (SELECT COUNT(*) FROM uplinks u WHERE u.dev_addr = d.dev_addr)
+                 FROM lns_devices d
+                 LEFT JOIN sessions s ON s.dev_addr = d.dev_addr
+                 ORDER BY d.application_id, d.dev_eui",
             )?;
             let rows = stmt.query_map([], |r| {
                 let dev_eui: Vec<u8> = r.get(0)?;
                 let dev_addr: Option<i64> = r.get(1)?;
                 let activation_mode: String = r.get(2)?;
+                let application_id: String = r.get(3)?;
+                let region: String = r.get(4)?;
+                let enabled: bool = r.get::<_, i64>(5)? != 0;
+                let last_seen_timestamp: Option<i64> = r.get(6)?;
+                let uplink_count: Option<i64> = r.get(7)?;
                 Ok(LnsDeviceListRow {
                     activation_mode,
                     dev_eui_hex: hex_upper_8(&dev_eui),
                     dev_addr_hex: dev_addr.map(|a| format!("{:08X}", a as u32)),
-                    application_id: r.get(3)?,
-                    region: r.get(4)?,
-                    enabled: r.get::<_, i64>(5)? != 0,
+                    application_id,
+                    region,
+                    enabled,
+                    last_seen_timestamp,
+                    uplink_count,
                 })
             })?;
             let mut v = Vec::new();
@@ -202,6 +214,51 @@ impl SqlitePersistence {
             Ok(v)
         })
     }
+
+    pub fn lns_show_device(&self, dev_eui_hex: &str) -> AppResult<Option<LnsDeviceShowRow>> {
+        self.run_with_busy_retry(|conn| {
+            let dev_eui_b = parse_hex_dev_eui(dev_eui_hex)
+                .map_err(|e| rusqlite::Error::InvalidParameterName(e))?;
+            let mut stmt = conn.prepare(
+                "SELECT d.dev_eui, d.dev_addr, d.activation_mode, d.application_id, d.region, d.enabled,
+                        s.updated_at_ms,
+                        (SELECT COUNT(*) FROM uplinks u WHERE u.dev_addr = d.dev_addr),
+                        s.nwk_s_key, s.app_s_key
+                 FROM lns_devices d
+                 LEFT JOIN sessions s ON s.dev_addr = d.dev_addr
+                 WHERE d.dev_eui = ?1",
+            )?;
+            let row = stmt.query_row(params![&dev_eui_b[..]], |r| {
+                let dev_eui: Vec<u8> = r.get(0)?;
+                let dev_addr: Option<i64> = r.get(1)?;
+                let activation_mode: String = r.get(2)?;
+                let application_id: String = r.get(3)?;
+                let region: String = r.get(4)?;
+                let enabled: bool = r.get::<_, i64>(5)? != 0;
+                let last_seen_timestamp: Option<i64> = r.get(6)?;
+                let uplink_count: Option<i64> = r.get(7)?;
+                let nwk_s_key: Option<Vec<u8>> = r.get(8)?;
+                let app_s_key: Option<Vec<u8>> = r.get(9)?;
+                Ok(LnsDeviceShowRow {
+                    activation_mode,
+                    dev_eui_hex: hex_upper_8(&dev_eui),
+                    dev_addr_hex: dev_addr.map(|a| format!("{:08X}", a as u32)),
+                    application_id,
+                    region,
+                    enabled,
+                    last_seen_timestamp,
+                    uplink_count,
+                    nwk_s_key_hex: nwk_s_key.as_ref().map(|v| hex_upper_16(v.as_slice())),
+                    app_s_key_hex: app_s_key.as_ref().map(|v| hex_upper_16(v.as_slice())),
+                })
+            });
+            match row {
+                Ok(r) => Ok(Some(r)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+    }
 }
 
 fn hex_upper_8(bytes: &[u8]) -> String {
@@ -209,6 +266,17 @@ fn hex_upper_8(bytes: &[u8]) -> String {
         return format!("invalid_len_{}", bytes.len());
     }
     bytes.iter().fold(String::with_capacity(16), |mut acc, b| {
+        use std::fmt::Write as _;
+        let _ = write!(&mut acc, "{b:02X}");
+        acc
+    })
+}
+
+fn hex_upper_16(bytes: &[u8]) -> String {
+    if bytes.len() != 16 {
+        return format!("invalid_len_{}", bytes.len());
+    }
+    bytes.iter().fold(String::with_capacity(32), |mut acc, b| {
         use std::fmt::Write as _;
         let _ = write!(&mut acc, "{b:02X}");
         acc
@@ -232,6 +300,29 @@ pub struct LnsDeviceListRow {
     pub application_id: String,
     pub region: String,
     pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_timestamp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uplink_count: Option<i64>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LnsDeviceShowRow {
+    pub activation_mode: String,
+    pub dev_eui_hex: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dev_addr_hex: Option<String>,
+    pub application_id: String,
+    pub region: String,
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_timestamp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uplink_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nwk_s_key_hex: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_s_key_hex: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
