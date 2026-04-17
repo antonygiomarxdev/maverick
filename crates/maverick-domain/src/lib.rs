@@ -4,6 +4,6 @@ pub mod identifiers;
 pub mod region;
 pub mod session;
 
-pub use identifiers::{DevAddr, DevEui, GatewayEui};
+pub use identifiers::{DevAddr, DevEui, Eui64, GatewayEui};
 pub use region::RegionId;
 pub use session::{DeviceClass, LoRaWANVersion, SessionSnapshot};
