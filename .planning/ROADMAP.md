@@ -58,9 +58,24 @@ Plans:
 - [x] 02-C-PLAN.md — `maverick-adapter-radio-spi` + libloragw / feature `spi` + runtime wiring (RADIO-01/02)
 - [x] 02-D-PLAN.md — `hardware-registry.toml` + docs (CORE-04, RADIO-04)
 
-### Phase 3: Class A Downlink
-**Goal**: Maverick can send downlinks to Class A devices through both RX windows, with confirmed-uplink ACKs, and the downlink queue survives process restarts
+### Phase 3: Protocol Security
+**Goal**: Every accepted uplink is cryptographically verified (MIC) and frame-counted correctly at 32 bits — Maverick behaves as a real LNS, not an open relay
 **Depends on**: Phase 1
+**Requirements**: PROT-01, PROT-02, PROT-03, PROT-04, PROT-05, PROT-06
+**Success Criteria** (what must be TRUE):
+  1. A frame with a tampered MIC is rejected and logged; a frame with a valid MIC is accepted and persisted to SQLite
+  2. A device that has sent more than 65535 uplinks continues to have its FCnt correctly reconstructed — session does not break
+  3. NwkSKey and AppSKey are stored per session in SQLite and used for MIC computation and payload decryption
+  4. Decrypted uplink payload is persisted to SQLite alongside raw frame data
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — LoRaWAN spec test vectors for MIC, decryption, FCnt (20 new tests)
+- [ ] 03-02-PLAN.md — Integration tests: UDP adapter MIC extraction, e2e pipeline, SPI contract docs
+
+### Phase 3.1: Class A Downlink (INSERTED — deferred from original Phase 3)
+**Goal**: Maverick can send downlinks to Class A devices through both RX windows, with confirmed-uplink ACKs, and the downlink queue survives process restarts
+**Depends on**: Phase 3 (Protocol Security)
 **Requirements**: DWNL-01, DWNL-02, DWNL-03, DWNL-04, DWNL-05, DWNL-06
 **Success Criteria** (what must be TRUE):
   1. When a downlink is queued for a device, Maverick transmits it in the RX1 window (1 second after uplink end) using the hardware timestamp from the concentrator
@@ -103,6 +118,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Protocol Correctness | 6/6 | Complete | 2026-04-16 |
 | 2. Radio Abstraction & SPI | 4/4 | Complete (SPI placeholder until libloragw RX) | 2026-04-16 |
-| 3. Class A Downlink | 0/TBD | Not started | - |
+| 3. Protocol Security | 2/2 | Planned | - |
+| 3.1. Class A Downlink | 0/TBD | Not started | - |
 | 4. Process Supervision | 0/TBD | Not started | - |
 | 5. TUI Device Management | 0/TBD | Not started | - |
