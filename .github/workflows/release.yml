@@ -160,19 +160,6 @@ jobs:
           cd ..
           sha256sum ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
 
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ matrix.target }}
-          format: spdx-json
-          output-file: sbom-${{ matrix.target }}.spdx.json
-
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-${{ matrix.artifact }}
-          path: sbom-${{ matrix.target }}.spdx.json
-
       - name: Verify packaged archive contents
         shell: bash
         run: |
