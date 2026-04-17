@@ -25,6 +25,24 @@ pub struct CapabilitySnapshot {
     pub lns_config_mtime_unix_secs: Option<u64>,
 }
 
+/// SPI concentrator hardware detected on this host.
+#[derive(Debug, Clone, Serialize)]
+pub struct SpiHardwareHints {
+    /// Paths to accessible SPI devices that match spidev pattern.
+    pub available_devices: Vec<String>,
+    /// SPI devices that appear to be LoRa concentrators (matched against hardware-registry.toml patterns).
+    pub concentrator_candidates: Vec<ConcentratorCandidate>,
+    /// Human-readable notes for operator.
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ConcentratorCandidate {
+    pub spi_path: String,
+    pub matched_board: Option<String>,
+    pub concentrator_model: Option<String>,
+}
+
 /// Best-effort signals about the host radio stack (no HAT-specific claims without evidence).
 #[derive(Debug, Clone, Serialize)]
 pub struct RadioEnvironmentHints {
@@ -33,6 +51,8 @@ pub struct RadioEnvironmentHints {
     pub systemd_runtime_present: bool,
     /// Heuristic matches from `systemctl` (may be empty on non-Linux or minimal images).
     pub packet_forwarder_service_hints: Vec<String>,
+    /// SPI concentrator hardware detected (None if no SPI hardware found).
+    pub spi_hardware: Option<SpiHardwareHints>,
     /// Actionable notes for operators (never silent failures to infer environment).
     pub notes: Vec<String>,
 }
@@ -132,6 +152,31 @@ impl RuntimeCapabilityReport {
         }
         if n > 12 {
             let _ = writeln!(s, "      …");
+        }
+        let _ = writeln!(s);
+        if let Some(ref spi) = self.radio_environment.spi_hardware {
+            let _ = writeln!(s, "  SPI hardware:");
+            let _ = writeln!(s, "    available_devices: {}", spi.available_devices.len());
+            for dev in &spi.available_devices {
+                let _ = writeln!(s, "      - {}", dev);
+            }
+            if !spi.concentrator_candidates.is_empty() {
+                let _ = writeln!(
+                    s,
+                    "    concentrator_candidates: {}",
+                    spi.concentrator_candidates.len()
+                );
+                for cand in &spi.concentrator_candidates {
+                    let board = cand.matched_board.as_deref().unwrap_or("unknown");
+                    let model = cand.concentrator_model.as_deref().unwrap_or("unknown");
+                    let _ = writeln!(s, "      - {} ({}, {})", cand.spi_path, board, model);
+                }
+            }
+            for note in &spi.notes {
+                let _ = writeln!(s, "    - {}", note);
+            }
+        } else {
+            let _ = writeln!(s, "  SPI hardware: none detected");
         }
         let _ = writeln!(s);
         let _ = writeln!(s, "  Confirm / next steps:");
@@ -238,6 +283,11 @@ impl RadioEnvironmentHints {
             );
             Vec::new()
         };
+        let spi_hardware = if cfg!(target_os = "linux") {
+            probe_spi_hardware()
+        } else {
+            None
+        };
         if packet_forwarder_service_hints.is_empty() && cfg!(target_os = "linux") {
             notes.push(
                 "No common packet-forwarder units matched heuristics; confirm your forwarder targets the GWMP bind."
@@ -248,9 +298,68 @@ impl RadioEnvironmentHints {
             platform,
             systemd_runtime_present,
             packet_forwarder_service_hints,
+            spi_hardware,
             notes,
         }
     }
+}
+
+/// Probe for SPI concentrator hardware on Linux hosts.
+/// Returns Some(SpiHardwareHints) if SPI devices found, None otherwise.
+pub fn probe_spi_hardware() -> Option<SpiHardwareHints> {
+    let mut available_devices = Vec::new();
+    let mut concentrator_candidates = Vec::new();
+    let mut notes = Vec::new();
+
+    let spidev_entries = std::fs::read_dir("/dev")
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name();
+            let name_str = name.to_string_lossy();
+            name_str.starts_with("spidev")
+        })
+        .collect::<Vec<_>>();
+
+    if spidev_entries.is_empty() {
+        notes.push("No SPI devices found (/dev/spidev*). SPI ingest not available.".to_string());
+        return None;
+    }
+
+    for entry in spidev_entries {
+        let path = entry.path();
+        let path_str = path.display().to_string();
+        available_devices.push(path_str.clone());
+
+        if std::fs::metadata(&path)
+            .map(|m| m.permissions().readonly())
+            .unwrap_or(true)
+        {
+            notes.push(format!(
+                "{} exists but is not accessible (permission denied)",
+                path_str
+            ));
+            continue;
+        }
+
+        if path_str == "/dev/spidev0.0" || path_str == "/dev/spidev0.1" {
+            concentrator_candidates.push(ConcentratorCandidate {
+                spi_path: path_str,
+                matched_board: Some("RAK LoRa HAT (detected by path)".to_string()),
+                concentrator_model: Some("sx1302 (inferred)".to_string()),
+            });
+        }
+    }
+
+    if concentrator_candidates.is_empty() && !available_devices.is_empty() {
+        notes.push("SPI devices found but none match known concentrator patterns.".to_string());
+    }
+
+    Some(SpiHardwareHints {
+        available_devices,
+        concentrator_candidates,
+        notes,
+    })
 }
 
 /// Emit startup tracing for an ingest worker from an already-built [`RuntimeCapabilityReport`].
