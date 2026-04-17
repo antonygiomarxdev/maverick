@@ -9,6 +9,7 @@ pub mod names {
     pub const LNS_DEVICES: &str = "lns_devices";
     pub const LNS_PENDING: &str = "lns_pending";
     pub const LNS_META: &str = "lns_meta";
+    pub const DOWNLINK_QUEUE: &str = "downlink_queue";
 }
 
 pub mod sessions_columns {
@@ -41,6 +42,20 @@ pub mod audit_columns {
     pub const OUTCOME: &str = "outcome";
     pub const METADATA: &str = "metadata";
     pub const CREATED_AT_MS: &str = "created_at_ms";
+}
+
+pub mod downlink_columns {
+    pub const ID: &str = "id";
+    pub const DEV_EUI: &str = "dev_eui";
+    pub const DEV_ADDR: &str = "dev_addr";
+    pub const F_PORT: &str = "f_port";
+    pub const PAYLOAD: &str = "payload";
+    pub const CONFIRMED: &str = "confirmed";
+    pub const ACK_FLAG: &str = "ack_flag";
+    pub const ENQUEUED_AT_MS: &str = "enqueued_at_ms";
+    pub const FRAME_COUNTER: &str = "frame_counter";
+    pub const STATUS: &str = "status";
+    pub const TRANSMITTED_AT_MS: &str = "transmitted_at_ms";
 }
 
 pub const DDL_INIT: &str = include_str!("schema.sql");
@@ -154,4 +169,35 @@ pub fn sql_hard_trim_sessions(batch: i64) -> String {
     format!(
         "DELETE FROM {SESSIONS} WHERE {DEV_ADDR} IN (SELECT {DEV_ADDR} FROM {SESSIONS} ORDER BY {UPDATED_AT_MS} ASC LIMIT {batch})"
     )
+}
+
+pub fn sql_insert_downlink() -> String {
+    use downlink_columns::{
+        ACK_FLAG, CONFIRMED, DEV_ADDR, DEV_EUI, ENQUEUED_AT_MS, FRAME_COUNTER, F_PORT, PAYLOAD,
+        STATUS,
+    };
+    use names::DOWNLINK_QUEUE;
+    format!(
+        "INSERT INTO {DOWNLINK_QUEUE} ({DEV_EUI}, {DEV_ADDR}, {F_PORT}, {PAYLOAD}, {CONFIRMED}, {ACK_FLAG}, {ENQUEUED_AT_MS}, {FRAME_COUNTER}, {STATUS}) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending')"
+    )
+}
+
+pub fn sql_select_pending_downlinks() -> String {
+    use downlink_columns::{
+        ACK_FLAG, CONFIRMED, DEV_ADDR, DEV_EUI, ENQUEUED_AT_MS, FRAME_COUNTER, F_PORT, ID, PAYLOAD,
+        STATUS,
+    };
+    use names::DOWNLINK_QUEUE;
+    format!(
+        "SELECT {ID}, {DEV_EUI}, {DEV_ADDR}, {F_PORT}, {PAYLOAD}, {CONFIRMED}, {ACK_FLAG}, {ENQUEUED_AT_MS}, {FRAME_COUNTER} \
+         FROM {DOWNLINK_QUEUE} WHERE {DEV_EUI} = ?1 AND {STATUS} = 'pending' \
+         ORDER BY {ENQUEUED_AT_MS} ASC LIMIT ?2"
+    )
+}
+
+pub fn sql_update_downlink_status() -> String {
+    use downlink_columns::{STATUS, TRANSMITTED_AT_MS};
+    use names::DOWNLINK_QUEUE;
+    format!("UPDATE {DOWNLINK_QUEUE} SET {STATUS} = ?1, {TRANSMITTED_AT_MS} = ?2 WHERE id = ?3")
 }

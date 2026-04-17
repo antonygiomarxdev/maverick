@@ -9,7 +9,7 @@ mod uplink_source;
 
 pub use audit_sink::{AuditRecord, AuditSink};
 pub use device_repository::DeviceRepository;
-pub use downlink_repository::{DownlinkEnqueue, DownlinkRepository};
+pub use downlink_repository::{DownlinkEnqueue, DownlinkItem, DownlinkRepository};
 pub use radio_transport::{DownlinkFrame, RadioTransport, UplinkObservation};
 pub use session_repository::SessionRepository;
 pub use uplink_ingress::{UplinkBackendKind, UplinkIngressBackend};

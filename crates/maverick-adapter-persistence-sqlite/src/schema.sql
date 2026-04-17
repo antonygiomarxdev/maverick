@@ -75,3 +75,19 @@ CREATE TABLE IF NOT EXISTS lns_meta (
     rate_limit_per_gateway_per_minute INTEGER NOT NULL,
     pending_ttl_secs INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS downlink_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dev_eui BLOB NOT NULL,
+    dev_addr INTEGER NOT NULL,
+    f_port INTEGER NOT NULL,
+    payload BLOB NOT NULL,
+    confirmed INTEGER NOT NULL DEFAULT 0,
+    ack_flag INTEGER NOT NULL DEFAULT 0,
+    enqueued_at_ms INTEGER NOT NULL,
+    frame_counter INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    transmitted_at_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_downlink_dev_eui ON downlink_queue(dev_eui);
+CREATE INDEX IF NOT EXISTS idx_downlink_status ON downlink_queue(status);
