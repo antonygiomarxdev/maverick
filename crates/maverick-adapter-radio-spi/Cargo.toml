@@ -5,9 +5,12 @@ edition.workspace = true
 license.workspace = true
 description = "SX1302/SX1303 SPI concentrator adapter (libloragw integration; feature-gated)"
 
+[build-dependencies]
+cc = { version = "1", optional = true }
+
 [features]
 default = []
-spi = []
+spi = ["dep:cc"]
 
 [dependencies]
 maverick-core = { workspace = true }
