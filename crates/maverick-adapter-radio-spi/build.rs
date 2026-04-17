@@ -28,6 +28,9 @@ fn main() {
     // Detect cross-compilation target
     let target = std::env::var("CARGO_BUILD_TARGET").ok();
 
+    // Always include the local libloragw inc dir first
+    build.include("libloragw/libloragw/inc");
+
     // Check CFLAGS_* env vars for --sysroot (set by release.yml cross-compilation setup)
     // These are the primary mechanism since release.yml sets CFLAGS_aarch64_* and CFLAGS_armv7_*
     if let Some(cflags) = std::env::var("CFLAGS").ok() {
@@ -70,6 +73,10 @@ fn main() {
             }
         }
     }
+
+    build
+        .flag("-Wno-unused-parameter")
+        .flag("-Wno-sign-compare");
 
     build.compile("loragw");
 

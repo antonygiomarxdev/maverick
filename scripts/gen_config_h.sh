@@ -8,6 +8,9 @@ VERSION_FILE="libloragw/VERSION"
 CONFIG_FILE="libloragw/libloragw/inc/config.h"
 LIBRARY_CFG="libloragw/libloragw/library.cfg"
 
+SYSROOT_AARCH64="/usr/aarch64-linux-gnu"
+SYSROOT_ARMV7="/usr/arm-linux-gnueabihf"
+
 if [[ ! -f "$VERSION_FILE" ]]; then
     echo "ERROR: VERSION file not found at $VERSION_FILE" >&2
     exit 1
@@ -91,10 +94,9 @@ while IFS= read -r line; do
     esac
 done < "$LIBRARY_CFG"
 
-cat > "$CONFIG_FILE" << EOF
-#ifndef _LORAGW_CONFIGURATION_H
+CONFIG_CONTENT="#ifndef _LORAGW_CONFIGURATION_H
 #define _LORAGW_CONFIGURATION_H
-	#define LIBLORAGW_VERSION	"${LIBLORAGW_VERSION}"
+	#define LIBLORAGW_VERSION	\"${LIBLORAGW_VERSION}\"
 	#define DEBUG_AUX		${DEBUG_AUX}
 	#define DEBUG_COM		${DEBUG_COM}
 	#define DEBUG_MCU		${DEBUG_MCU}
@@ -109,6 +111,16 @@ cat > "$CONFIG_FILE" << EOF
 	#define DEBUG_SX1302	${DEBUG_SX1302}
 	#define DEBUG_FTIME		${DEBUG_FTIME}
 #endif
-EOF
+"
+
+echo "$CONFIG_CONTENT" > "$CONFIG_FILE"
+
+if [[ -d "$SYSROOT_AARCH64" ]]; then
+    echo "$CONFIG_CONTENT" > "$SYSROOT_AARCH64/include/config.h"
+fi
+
+if [[ -d "$SYSROOT_ARMV7" ]]; then
+    echo "$CONFIG_CONTENT" > "$SYSROOT_ARMV7/include/config.h"
+fi
 
 echo "Generated $CONFIG_FILE"
