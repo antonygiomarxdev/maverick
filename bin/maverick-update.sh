@@ -23,7 +23,12 @@ else
 fi
 
 # Get current version
-CURRENT_VERSION=$(/usr/local/bin/maverick-edge --version 2>/dev/null | awk '{print $2}' || echo "unknown")
+if /usr/local/bin/maverick-edge --version >/dev/null 2>&1; then
+  CURRENT_VERSION=$(/usr/local/bin/maverick-edge --version 2>/dev/null | awk '{print $2}' || echo "unknown")
+else
+  # Fallback: read from /var/lib/maverick/version or assume unknown
+  CURRENT_VERSION=$(cat /var/lib/maverick/version 2>/dev/null || echo "unknown")
+fi
 
 log "Current version: $CURRENT_VERSION, mode: $UPDATE_MODE"
 
@@ -71,6 +76,7 @@ if [ "$UPDATE_MODE" = "release" ] && [ -n "$RELEASE_URL" ]; then
     if [ -f "$DOWNLOAD_DIR/extracted/maverick-edge" ]; then
       cp "$DOWNLOAD_DIR/extracted/maverick-edge" "$BINARY_PATH"
       chmod 755 "$BINARY_PATH"
+      echo "$LATEST_VERSION" > /var/lib/maverick/version
       log "Binary updated to $LATEST_VERSION"
     else
       log "Extracted binary not found"
