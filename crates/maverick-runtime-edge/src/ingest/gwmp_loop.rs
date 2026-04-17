@@ -37,6 +37,8 @@ fn listen_label(selection: &RadioIngestSelection) -> &str {
     match selection {
         RadioIngestSelection::Udp { bind } => bind.as_str(),
         RadioIngestSelection::Spi { spi_path } => spi_path.as_str(),
+        RadioIngestSelection::AutoSpi { spi_path, .. } => spi_path.as_str(),
+        RadioIngestSelection::AutoUdp { bind, .. } => bind.as_str(),
     }
 }
 
@@ -61,6 +63,25 @@ fn trace_ingest_identity(selection: &RadioIngestSelection) {
         }
         #[cfg(not(feature = "spi"))]
         RadioIngestSelection::Spi { .. } => {}
+        RadioIngestSelection::AutoSpi { .. } => {
+            #[cfg(feature = "spi")]
+            {
+                let backend = SpiConcentratorIngressBackend;
+                tracing::info!(
+                    backend_id = backend.id(),
+                    backend_kind = ?backend.kind(),
+                    "uplink ingress backend (SPI concentrator, auto-detected)"
+                );
+            }
+        }
+        RadioIngestSelection::AutoUdp { .. } => {
+            let backend = GwmpUdpIngressBackend;
+            tracing::info!(
+                backend_id = backend.id(),
+                backend_kind = ?backend.kind(),
+                "uplink ingress backend (GWMP/UDP, SPI auto-detect fallback)"
+            );
+        }
     }
 }
 

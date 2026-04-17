@@ -243,6 +243,14 @@ impl RuntimeCapabilityReport {
                 "sx130x_spi",
                 spi_path.clone(),
             ),
+            RadioIngestSelection::AutoSpi { spi_path, .. } => (
+                UplinkBackendKind::ConcentratorSpi,
+                "sx130x_spi_auto",
+                spi_path.clone(),
+            ),
+            RadioIngestSelection::AutoUdp { bind, .. } => {
+                (UplinkBackendKind::GwmpUdp, "gwmp_udp_auto", bind.clone())
+            }
         };
         let lns_config_mtime_unix_secs = file_mtime_secs(&lns_path);
         let snapshot_id_ms = unix_time_ms();
