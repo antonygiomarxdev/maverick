@@ -133,12 +133,13 @@
 | DWNL-06 | Phase 3 | Complete |
 | RELI-03 | Phase 4 | Pending |
 | RELI-04 | Phase 4 | Pending |
-| SEC-02 | Phase 4 | Pending |
-| DEV-01 | Phase 5 | Pending |
+| SEC-02 | Phase 4, Phase 6 (deferred) | Pending |
+| DEV-01 | Phase 5, Phase 7 | Pending |
 | DEV-02 | Phase 5 | Pending |
-| DEV-03 | Phase 5 | Pending |
+| DEV-03 | Phase 5, Phase 7 | Pending |
 | DEV-04 | Phase 5 | Pending |
 | DEV-05 | Phase 5 | Pending |
+| CORE-03 | Phase 5, Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 29 total
