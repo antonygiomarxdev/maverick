@@ -15,6 +15,7 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 maverick-adapter-persistence-sqlite = { workspace = true }
 maverick-adapter-radio-udp = { workspace = true }
+maverick-runtime-edge = { path = "../maverick-runtime-edge" }
 rusqlite = { workspace = true }
 tempfile = "3"
 

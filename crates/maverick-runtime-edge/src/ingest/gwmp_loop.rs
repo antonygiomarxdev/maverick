@@ -21,6 +21,7 @@ use crate::radio_ingest_selection::{
     build_uplink_source, resolve_radio_ingest, RadioIngestSelection,
 };
 use crate::runtime_capabilities::{self, RuntimeCapabilityReport};
+use crate::watchdog::{send_ready, send_stopping, send_watchdog_ping};
 
 #[cfg(feature = "spi")]
 use maverick_adapter_radio_spi::SpiConcentratorIngressBackend;
@@ -268,6 +269,19 @@ pub(crate) async fn run_radio_ingest_supervised(
     let report = RuntimeCapabilityReport::build(bind.clone(), Some(lns_path));
     runtime_capabilities::log_ingest_capability_report(&report);
 
+    if let Err(e) = send_ready() {
+        tracing::warn!(error = %e, "failed to send READY=1 to systemd");
+    }
+
+    let watchdog_handle = tokio::spawn(async {
+        loop {
+            tokio::time::sleep(Duration::from_secs(15)).await;
+            if let Err(e) = send_watchdog_ping() {
+                tracing::warn!(error = %e, "watchdog ping failed");
+            }
+        }
+    });
+
     let sessions: Arc<dyn SessionRepository> = store.clone();
     let uplinks: Arc<dyn UplinkRepository> = store.clone();
     let audit: Arc<dyn AuditSink> = store.clone();
@@ -312,6 +326,8 @@ pub(crate) async fn run_radio_ingest_supervised(
             }
         }
     }
+    watchdog_handle.abort();
+    let _ = send_stopping();
     let out = edge_json::radio_ingest_loop_result(
         label.as_str(),
         read_timeout_ms,

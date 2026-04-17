@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 description = "Edge runtime composition: CLI, install profile, hardware probe"
 
+[lib]
+name = "maverick_runtime_edge"
+path = "src/lib.rs"
+
 [[bin]]
 name = "maverick-edge"
 path = "src/main.rs"

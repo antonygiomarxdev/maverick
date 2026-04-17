@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     downlink_fcnt INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
     application_id TEXT,
-    -- AES-128 session keys; stored as plaintext BLOB (encryption at rest deferred to Phase 4 / SEC-02).
+    -- AES-128 session keys; stored as plaintext BLOB (SEC-02: application-level encryption deferred - requires domain model changes to support encrypted key storage)
     nwk_s_key BLOB NOT NULL,
     app_s_key BLOB NOT NULL
 );

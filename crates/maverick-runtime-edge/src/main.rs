@@ -5,14 +5,15 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use maverick_core::InstallProfile;
 
-mod cli_constants;
-mod commands;
-mod edge_json;
-mod ingest;
-mod paths;
-mod probe;
-mod radio_ingest_selection;
-mod runtime_capabilities;
+pub mod cli_constants;
+pub mod commands;
+pub mod edge_json;
+pub mod ingest;
+pub mod paths;
+pub mod probe;
+pub mod radio_ingest_selection;
+pub mod runtime_capabilities;
+pub mod watchdog;
 
 use cli_constants::{
     DEFAULT_DATA_DIR, DEFAULT_GWMP_BIND_ADDR, DEFAULT_GWMP_INGEST_TIMEOUT_MS,
