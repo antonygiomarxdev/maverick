@@ -25,12 +25,12 @@
 
 ### LoRaWAN Class A (Downlink)
 
-- [ ] **DWNL-01**: LNS schedules Class A downlink in RX1 window (1s after uplink end) when downlink is queued
-- [ ] **DWNL-02**: LNS falls back to RX2 window (2s after uplink end) if RX1 transmission fails
-- [ ] **DWNL-03**: LNS sends ACK flag in downlink for confirmed uplinks
-- [ ] **DWNL-04**: Downlink queue persists to SQLite (survives process restart)
-- [ ] **DWNL-05**: Downlink transmission uses precise hardware timestamp from concentrator to hit RX1/RX2 windows within LoRaWAN Class A timing tolerance
-- [ ] **DWNL-06**: LNS parses LinkCheckReq MAC command from FOpts and responds with LinkCheckAns in next downlink
+- [x] **DWNL-01**: LNS schedules Class A downlink in RX1 window (1s after uplink end) when downlink is queued
+- [x] **DWNL-02**: LNS falls back to RX2 window (2s after uplink end) if RX1 transmission fails
+- [x] **DWNL-03**: LNS sends ACK flag in downlink for confirmed uplinks
+- [x] **DWNL-04**: Downlink queue persists to SQLite (survives process restart)
+- [x] **DWNL-05**: Downlink transmission uses precise hardware timestamp from concentrator to hit RX1/RX2 windows within LoRaWAN Class A timing tolerance
+- [x] **DWNL-06**: LNS parses LinkCheckReq MAC command from FOpts and responds with LinkCheckAns in next downlink
 
 ### Radio Hardware (SPI Direct)
 
@@ -125,12 +125,12 @@
 | RADIO-02 | Phase 2 | Pending |
 | RADIO-03 | Phase 2 | Pending |
 | RADIO-04 | Phase 2 | Pending |
-| DWNL-01 | Phase 3 | Pending |
-| DWNL-02 | Phase 3 | Pending |
-| DWNL-03 | Phase 3 | Pending |
-| DWNL-04 | Phase 3 | Pending |
-| DWNL-05 | Phase 3 | Pending |
-| DWNL-06 | Phase 3 | Pending |
+| DWNL-01 | Phase 3 | Complete |
+| DWNL-02 | Phase 3 | Complete |
+| DWNL-03 | Phase 3 | Complete |
+| DWNL-04 | Phase 3 | Complete |
+| DWNL-05 | Phase 3 | Complete |
+| DWNL-06 | Phase 3 | Complete |
 | RELI-03 | Phase 4 | Pending |
 | RELI-04 | Phase 4 | Pending |
 | SEC-02 | Phase 4 | Pending |
