@@ -1,197 +1,193 @@
 # Maverick — Vision
 
-**Maverick es un LNS offline-first, self-contained, que trata la integridad de datos como innegociable: construido para correr donde nada más lo hace, y extensible por una comunidad que lo hace crecer.**
+**LoRaWAN. Offline. Always.**
+
+Maverick is an offline-first, self-contained LoRaWAN stack that treats data integrity as non-negotiable: built to run where nothing else does, extensible by a community that makes it grow.
 
 ---
 
-## Qué Es
+## What It Is
 
-Maverick es un servidor de red LoRaWAN (LNS) diseñado para despliegues en edge donde la conectividad es nula, intermitente o inestable.
+Maverick is a LoRaWAN Network Server (LNS) designed for edge deployments where connectivity is null, intermittent, or unstable.
 
-**核心 valor:** Nunca perder un uplink — desde el radio hasta SQLite, los datos se preservan sin importar si hay internet, si las extensiones fallan, o si el proceso se reinicia.
-
----
-
-## Lo Que Es y Lo Que No Es
-
-### Es
-
-- Un **stack completo** que se instala y funciona: LNS + radio directo (SX1302/3), sin dependencias externas
-- **Offline-first**: cero llamados a la nube en el runtime core; toda persistencia es local
-- **Extensible**: todo es opcional — TUI, dashboard, HTTP, MQTT, webhooks, AI — instalado y configurado por el operador
-- **Aislado**: las extensiones son procesos separados que nunca afectan la estabilidad del LNS core
-- **Opensource**: la comunidad contribuye al core, extensiones, documentación, compatibilidad de hardware
-- **Compatible con AI**: extensiones oficiales que aprovechan APIs de AI (Claude, OpenAI); puerta abierta para ML local en hardware más capaz
-
-### No Es
-
-- Un servicio cloud
-- Dependiente de conectividad
-- Un producto cerrado o monolítico
-- Diseñado para Windows o macOS (Linux only)
-- Un reemplazo de TTN/The Things Stack (puede integrarse con ellos)
+**Core value:** Never lose an uplink — from radio to SQLite, data is preserved regardless of internet connectivity, extension failures, or process restarts.
 
 ---
 
-## Principios
+## What It Is and What It Is Not
 
-### 1. Fiabilidad sobre todo
+### It Is
 
-El LNS core nunca se cae, nunca pierde datos, nunca se bloquea por causas externas. Si el dashboard falla, el LNS sigue. Si el internet se va, el LNS sigue. Si una extensión tiene un bug, el LNS sigue.
+- A **complete stack** that installs and works: LNS + direct radio (SX1302/3), no external dependencies
+- **Offline-first**: zero calls to the cloud in the core runtime; all persistence is local
+- **Extensible**: everything is optional — TUI, dashboard, HTTP, MQTT, webhooks, AI — installed and configured by the operator
+- **Isolated**: extensions are separate processes that never affect the LNS core stability
+- **Opensource**: the community contributes to core, extensions, documentation, hardware compatibility
+- **AI-compatible**: official extensions that leverage AI APIs (Claude, OpenAI); door open for local ML on more capable hardware
 
-### 2. Instalación trivial, configuración flexible
+### It Is Not
 
-Con `maverick install` tenés un LNS funcional. Después, el operador elige qué extensiones instalar y cómo configurarlas via CLI interactiva o archivos de config.
-
-### 3. El Edge es la fuente de verdad
-
-El edge autoridad sobre sus datos. Maverick Cloud recibe sincronización, pero no es necesaria para el funcionamiento. Cuando la conectividad regresa, se sincroniza lo pendiente.
-
-### 4. Extensiones como ciudadanos de primera clase
-
-Las extensiones no son second-class citizens. Tienen la misma calidad y documentación que el core. La comunidad puede contribuir extensiones oficiales y community-driven.
-
-### 5. AI desde el core, no en el core
-
-El core expone datos de forma clara para que extensiones AI los consuman. No hay LLM corriendo en el edge por default (hardware limitado), pero la puerta está abierta para cuando el hardware lo permita.
+- A cloud service
+- Connectivity-dependent
+- A closed or monolithic product
+- Designed for Windows or macOS (Linux only)
+- A replacement for TTN/The Things Stack (can integrate with them)
 
 ---
 
-## Arquitectura de Extensiones
+## Principles
+
+### 1. Reliability Above All
+
+The LNS core never falls, never loses data, never blocks due to external causes. If the dashboard fails, the LNS continues. If internet goes down, the LNS continues. If an extension has a bug, the LNS continues.
+
+### 2. Zero Cloud Dependency
+
+The runtime has zero calls to external services. All persistence is local.
+
+### 3. Everything Is Optional
+
+TUI, dashboard, HTTP, MQTT, AI — the operator chooses what to install. Nothing is forced.
+
+### 4. Extension Isolation
+
+Extensions are separate processes. They can fail, crash, or misbehave without affecting the core.
+
+### 5. Community-Driven
+
+Opensource. Contributions welcome in core, extensions, hardware compatibility, documentation, and AI integrations.
+
+### 6. AI-Compatible
+
+Extensions can leverage AI APIs (Claude, OpenAI, etc.). Door open for local ML when hardware allows.
+
+---
+
+## Extension Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     maverick-edge                       │
-│                   (LNS Core - siempre arriba)            │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────────┐  │
-│  │ SQLite  │  │ Radio   │  │  CLI    │  │ Extension │  │
-│  │ persist │  │ adapter │  │ management│ │   IPC     │  │
-│  └─────────┘  └─────────┘  └─────────┘  └───────────┘  │
+│                (Gateway + LNS — always up)               │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
+│  │  Radio  │  │ SQLite  │  │   CLI   │  │  IPC    │  │
+│  │   SPI   │  │persist  │  │   mgmt  │  │ surface │  │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘  │
 └─────────────────────────────────────────────────────────┘
                               │
-                              │ Unix pipes / TCP / HTTP local
+                              │ (Unix pipes / TCP / HTTP local)
                               ▼
         ┌──────────────────┼───────────────────┬──────────┐
         ▼                  ▼                   ▼          ▼
   ┌──────────┐      ┌──────────┐      ┌──────────┐ ┌────────┐
-  │ maverick │      │  HTTP    │      │  MQTT    │ │  AI    │
-  │   TUI    │      │ outbound │      │ outbound │ │ext     │
+  │   TUI    │      │   HTTP    │      │   MQTT   │ │   AI   │
+  │(optional)│      │  outbound │      │ outbound │ │(optional)│
   └──────────┘      └──────────┘      └──────────┘ └────────┘
-        │                  │                   │         │
-        ▼                  ▼                   ▼         ▼
-     Operator           Cloud              Broker   OpenAI/
-     local              sync              (local)   Claude
-                                              │
-                                              ▼
-                                           MQTT
-                                           broker
 ```
 
-**Todas las extensiones son procesos separados.** Si cualquiera falla, el LNS sigue. El operador elige qué instalar.
+**All extensions are optional and separate processes.** The operator chooses what to install.
 
 ---
 
-## Sync con Maverick Cloud
+## Sync with Maverick Cloud
 
-**Modelo:** Muchos edges → un cloud (abierto a muchos→muchos).
+**Model:** Many edges → one cloud (open to many→many).
 
-- El edge **empuja** cuando tiene conectividad — no al revés
-- Conexión puede ser intermitente, lenta, o nula por días
-- Protocolo eficiente (MQTT o HTTPS con queue)
-- El edge mantiene cola de eventos pendientes con timestamps
-- **Eventual consistency**: cuando hay red, se sincroniza; cuando no hay, se acumula
-- Auth: token por edge + TLS
-- Conflictos: **cloud no gana** — el edge es source of truth para sus datos locales
+- The edge **pushes** when connectivity is available
+- Connection can be intermittent, slow, or absent for days
+- Efficient protocol (MQTT or HTTPS with queue)
+- Edge maintains queue of pending events with timestamps
+- **Eventual consistency**: when there's network, it syncs; when there isn't, it accumulates
+- Auth: token per edge + TLS
+- Conflicts: **edge wins** — edge is source of truth for its local data
 
-### Datos sync
+### Sync Data
 
-Por definir (configurable):
-- Uplinks + sesiones (core)
-- Métricas operativas
-- Logs (opcional, no por defecto)
+Configurable, but by default:
+- Uplinks + sessions (core)
+- Operational metrics
+- Logs (optional, not by default)
 
 ---
 
-## Instalación y Setup
+## Installation and Setup
 
-###Primera vez (CLI interactiva)
+### First Time (Interactive CLI)
 
 ```bash
 maverick install
-# Región LoRaWAN
-# Hardware de radio detectado
-# Extensiones a instalar (ninguna por defecto)
-# Credenciales / config inicial
+# LoRaWAN region
+# Detected radio hardware
+# Extensions to install (none by default)
+# Initial config / credentials
 ```
 
-Soporta deployment headless (SSH + config file o serial para setup inicial).
+Supports headless deployment (SSH + config file or serial for initial setup).
 
-### Operación continua
+### Ongoing Operation
 
 - CLI: `maverick device add ...`, `maverick config set ...`
-- Las extensiones se configuran via su propia CLI o archivo de config
-- Todo es gestionable via SSH
+- Extensions configured via their own CLI or config file
+- All manageable via SSH
 
 ### Updates
 
-Por definir (OTA o manual).
+TBD (OTA or manual).
 
 ---
 
-## Retención de Datos
+## Data Retention
 
-- **Core value**: nunca se pierde un uplink
-- Por default: persists indefinitely en SQLite local
-- Buffer circular configurable para proteger storage limitado (SD cards)
-- Estrategia de cleanup: configurable, no destructivo por defecto
+- **Core value**: no uplink is ever lost
+- By default: persists indefinitely in local SQLite
+- Configurable circular buffer to protect limited storage (SD cards)
+- Cleanup strategy: configurable, non-destructive by default
 
 ---
 
 ## Hardware
 
-- **Target principal**: Raspberry Pi 3/4 (armv7, aarch64) con concentrador RAK LoRa (SX1302/3)
-- **Mínimo**: armv7, 512 MB RAM, Linux
-- **Escalable**: binarios para x86_64, aarch64, armv7
-- **Extensible**: comunidad valida y extiende compatibilidad de hardware
+- **Target**: Raspberry Pi 3/4 (armv7/aarch64) with RAK LoRa concentrator HAT (SX1302/3)
+- **Minimum**: armv7, 512 MB RAM, Linux
+- **Multi-arch**: x86_64, aarch64, armv7 binaries
+- **Extensible**: community validates and extends hardware compatibility
 
 ---
 
-## Comunidad y Opensource
+## Community and Opensource
 
-Maverick es opensource y la contribución es bienvenida en todas las áreas:
+Maverick is opensource and contribution is welcome in all areas:
 
 - **Core**: bug fixes, features, protocol compliance
-- **Extensiones**: oficiales y community-driven
+- **Extensions**: official and community-driven
 - **Hardware**: drivers, compatibility testing
-- **Documentación**: guías, tutorials, case studies
-- **AI integrations**: nuevos providers, local ML
-
-### Licencia
-
-Por definir.
+- **Documentation**: guides, tutorials, case studies
+- **AI integrations**: new providers, local ML
 
 ---
 
-## Roadmap (Estado Actual)
+## Roadmap (Current Status)
 
-| Fase | Descripción | Estado |
-|------|-------------|--------|
-| 01 | Protocol Correctness (MIC, FCnt 32-bit, FRMPayload) | ✅ Complete |
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 01 | Protocol Correctness | ✅ Complete (partial) |
 | 02 | Radio Abstraction & SPI | ✅ Complete |
-| 03 | Class A Downlink | 🔲 Pendiente |
-| 04 | ? | 🔲 |
-| 05 | ? | 🔲 |
+| 03 | Protocol Security | 🔲 Pending |
+| 04 | Class A Downlink | 🔲 Pending |
+| 05 | Extension IPC | 🔲 Pending |
+| 06 | Process Supervision | 🔲 Pending |
+| 07 | Observability | 🔲 Pending |
+| 08 | Community-Ready | 🔲 Pending |
 
 ---
 
-## Constraints técnicos
+## Technical Constraints
 
-- **Rust**: hexagonal architecture, clean code
-- **Offline-first**: cero cloud calls en core
-- **Process isolation**: extensions son procesos separados
-- **Linux only**
-- **≤512 MB RAM** en target mínimo
-- **Compatibility**: `lns-config.toml` no rompe entre versiones
+- **Tech Stack**: Rust — hexagonal architecture, clean code
+- **Offline-first**: zero cloud calls in core
+- **Process isolation**: extensions are separate processes
+- **Hardware**: Linux only; must run on armv7 (Raspberry Pi 3) with ≤512 MB RAM
+- **Compatibility**: `lns-config.toml` format remains valid; no breaking changes in v1
 
 ---
 
