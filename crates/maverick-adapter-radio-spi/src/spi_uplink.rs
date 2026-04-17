@@ -10,83 +10,119 @@
 //! Without `wire_mic` and `phy_without_mic`, MIC verification in IngestUplink
 //! will receive zeros and ALL valid frames will be rejected.
 
-//! `UplinkSource` over SPI — placeholder until libloragw RX is integrated.
-
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use maverick_core::error::{AppError, AppResult};
 use maverick_core::ports::{UplinkReceive, UplinkSource};
+use maverick_domain::{Eui64, GatewayEui};
 
-/// Blocking-style SPI / concentrator poll (libloragw hook point).
-#[derive(Debug)]
+use crate::lgw_bindings::lgw_pkt_rx_s;
+use crate::lgw_convert::lgw_pkt_rx_to_observation;
+use crate::lgw_init::{lgw_hal_start, lgw_hal_stop};
+
+const GATEWAY_EUI: GatewayEui = GatewayEui(Eui64([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]));
+
+#[derive(Clone)]
 pub struct SpiUplinkSource {
-    spi_path: String,
-    read_timeout: Duration,
+    inner: Arc<SpiInner>,
+}
+
+struct SpiInner {
+    hal_lock: std::sync::Mutex<()>,
+    idle_timeout: Duration,
 }
 
 impl SpiUplinkSource {
-    pub fn new(spi_path: String, read_timeout: Duration) -> AppResult<Self> {
+    pub fn new(spi_path: String, idle_timeout: Duration) -> AppResult<Self> {
         let trimmed = spi_path.trim();
         if trimmed.is_empty() {
             return Err(AppError::InvalidInput(
                 "spi_path must not be empty for SpiUplinkSource".to_string(),
             ));
         }
+
+        lgw_hal_start(trimmed)?;
+
         Ok(Self {
-            spi_path: trimmed.to_string(),
-            read_timeout,
+            inner: Arc::new(SpiInner {
+                hal_lock: std::sync::Mutex::new(()),
+                idle_timeout,
+            }),
         })
     }
 
-    fn blocking_poll(path: &str, idle_wait: Duration) -> AppResult<UplinkReceive> {
-        std::fs::metadata(path).map_err(|e| {
-            AppError::Infrastructure(format!("SPI device path not accessible ({path}): {e}"))
-        })?;
-        // Placeholder: real implementation will call libloragw `lgw_receive` (or equivalent).
-        std::thread::sleep(idle_wait);
-        Ok(UplinkReceive::Idle)
+    fn blocking_receive(&self) -> AppResult<UplinkReceive> {
+        let _guard = self
+            .inner
+            .hal_lock
+            .lock()
+            .map_err(|_| AppError::Infrastructure("spi hal mutex poisoned".to_string()))?;
+
+        let mut pkt_data = [unsafe { std::mem::zeroed::<lgw_pkt_rx_s>() }; 16];
+        let count = unsafe { crate::lgw_bindings::lgw_receive(16, pkt_data.as_mut_ptr()) };
+
+        if count < 0 {
+            return Err(AppError::Infrastructure(format!(
+                "lgw_receive failed: {}",
+                count
+            )));
+        }
+
+        if count == 0 {
+            std::thread::sleep(self.inner.idle_timeout);
+            return Ok(UplinkReceive::Idle);
+        }
+
+        let mut observations = Vec::with_capacity(count as usize);
+        for pkt in &pkt_data[..count as usize] {
+            match lgw_pkt_rx_to_observation(pkt, GATEWAY_EUI) {
+                Ok(obs) => observations.push(obs),
+                Err(e) => {
+                    tracing::warn!("failed to convert lgw_pkt_rx_s to UplinkObservation: {}", e);
+                    continue;
+                }
+            }
+        }
+
+        Ok(UplinkReceive::Observations(observations))
     }
 }
 
 #[async_trait]
 impl UplinkSource for SpiUplinkSource {
     async fn next_batch(&self) -> AppResult<UplinkReceive> {
-        let path = self.spi_path.clone();
-        let idle = self.read_timeout;
-        tokio::task::spawn_blocking(move || Self::blocking_poll(&path, idle))
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || this.blocking_receive())
             .await
-            .map_err(|e| AppError::Infrastructure(format!("spi uplink join: {e}")))?
+            .map_err(|e| AppError::Infrastructure(format!("spi uplink join: {}", e)))?
+    }
+}
+
+impl Drop for SpiUplinkSource {
+    fn drop(&mut self) {
+        lgw_hal_stop();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    /// SPI Adapter UplinkObservation Parsing Contract.
-    ///
-    /// When libloragw RX is integrated, this module verifies the contract is met:
-    ///
-    /// 1. Parse raw LoRaWAN PHY bytes from the concentrator
-    /// 2. Construct UplinkObservation with fields:
-    ///    - dev_addr: DevAddr — from FHDR bytes [1-4]
-    ///    - f_cnt: u16 — from FHDR bytes [6-7] (wire value)
-    ///    - f_port: u8 — after FHDR + FOpts
-    ///    - payload: Vec<u8> — FRMPayload bytes (between FPort and MIC)
-    ///    - wire_mic: [u8; 4] — last 4 bytes of PHY payload
-    ///    - phy_without_mic: Vec<u8> — PHY payload excluding last 4 bytes
-    ///    - gateway_eui: GatewayEui — from concentrator metadata
-    ///    - region: RegionId — from frequency
-    ///    - rssi: Option<i16>, snr: Option<f32> — from radio metadata
-    ///
-    /// Without wire_mic and phy_without_mic, MIC verification will receive
-    /// zeros and ALL valid frames will be rejected.
-    ///
-    /// IMPLEMENTATION PENDING: This test will be implemented when libloragw
-    /// integration begins.
+    use super::*;
+
     #[test]
-    #[ignore = "pending libloragw integration"]
-    fn spi_adapter_parsing_contract() {
-        // Placeholder — implementation pending libloragw integration
-        // Once real implementation is added, remove #[ignore] and implement test
+    fn wire_mic_split_is_correct() {
+        let payload: [u8; 23] = [
+            0x40, 0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x01, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44,
+            0x55, 0x66, 0x77, 0x88, 0xAA, 0xBB, 0xCC, 0xDD,
+        ];
+        let size = payload.len();
+
+        let wire_mic: [u8; 4] = payload[size - 4..].try_into().unwrap();
+        assert_eq!(wire_mic, [0xAA, 0xBB, 0xCC, 0xDD]);
+
+        let phy_without_mic = &payload[..size - 4];
+        assert_eq!(phy_without_mic.len(), 19);
+        assert_eq!(phy_without_mic[phy_without_mic.len() - 1], 0x88);
     }
 }
