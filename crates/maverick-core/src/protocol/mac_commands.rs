@@ -86,9 +86,8 @@ impl ParsedMacCommands {
         let mut i = 0;
         while i < f_opts.len() {
             let cid = MacCid::from_u8(f_opts[i]);
-            match cid {
-                MacCid::LinkCheckReq => link_check_req = true,
-                _ => {}
+            if cid == MacCid::LinkCheckReq {
+                link_check_req = true;
             }
             // Move to next command (CID + command-specific length)
             // For LinkCheckReq, it's just 1 byte (CID only)
@@ -103,7 +102,7 @@ impl ParsedMacCommands {
 }
 
 /// Downlink decision returned by protocol handler after processing uplink.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DownlinkDecision {
     /// Set ACK flag on the next downlink if true.
     pub ack_flag: bool,
@@ -111,16 +110,6 @@ pub struct DownlinkDecision {
     pub mac_commands: Vec<u8>,
     /// DevEUI of the device (if known from session).
     pub dev_eui: Option<DevEui>,
-}
-
-impl Default for DownlinkDecision {
-    fn default() -> Self {
-        Self {
-            ack_flag: false,
-            mac_commands: Vec::new(),
-            dev_eui: None,
-        }
-    }
 }
 
 impl DownlinkDecision {

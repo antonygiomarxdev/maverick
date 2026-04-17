@@ -151,7 +151,7 @@ impl DownlinkRepository for SqlitePersistence {
     }
 
     async fn dequeue_oldest(&self, dev_eui: &DevEui, limit: usize) -> AppResult<Vec<DownlinkItem>> {
-        let dev_eui = dev_eui.clone();
+        let dev_eui = *dev_eui;
         let this = self.clone();
         this.run_blocking(move |p| {
             p.run_with_busy_retry(|conn| {
@@ -178,7 +178,7 @@ impl DownlinkRepository for SqlitePersistence {
                         frame_counter: row.get::<_, i64>(8)? as u32,
                     })
                 })?;
-                rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+                rows.collect::<Result<Vec<_>, _>>()
             })
         })
         .await

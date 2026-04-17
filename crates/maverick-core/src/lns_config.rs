@@ -20,6 +20,7 @@ pub struct LnsConfigDocument {
     pub devices: Vec<DeviceEntry>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for LnsConfigDocument {
     fn default() -> Self {
         Self {
@@ -75,6 +76,7 @@ fn default_pending_ttl() -> u64 {
     86_400
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for AutoprovisionPolicy {
     fn default() -> Self {
         Self {
