@@ -4,6 +4,7 @@
 //! - `release`: Download pre-built binary from release URL
 //! - `dev`: Build from source via git pull + cargo build
 
+pub mod cli;
 pub mod download;
 pub mod version;
 

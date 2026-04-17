@@ -77,6 +77,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: ConfigCmd,
     },
+    /// Update mechanism: check for updates, view status, or show history
+    Update {
+        #[command(subcommand)]
+        cmd: UpdateCmd,
+    },
 }
 
 #[derive(Subcommand)]
@@ -169,6 +174,20 @@ enum RadioCmd {
     },
 }
 
+#[derive(Subcommand)]
+enum UpdateCmd {
+    /// Check for available updates
+    Check,
+    /// Show current version and update status
+    Status,
+    /// Show update history from journal
+    History {
+        /// Number of history entries to show
+        #[arg(default_value = "10")]
+        lines: usize,
+    },
+}
+
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 enum ProfileArg {
     Constrained,
@@ -250,6 +269,26 @@ async fn main() {
             }
             ConfigCmd::ShowDevice { dev_eui } => {
                 config::run_config_show_device(cli.data_dir, db_file, dev_eui)
+            }
+        },
+        Commands::Update { cmd } => match cmd {
+            UpdateCmd::Check => {
+                if let Err(e) = update::cli::check() {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            UpdateCmd::Status => {
+                if let Err(e) = update::cli::status() {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            UpdateCmd::History { lines } => {
+                if let Err(e) = update::cli::history(lines) {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
             }
         },
     }
