@@ -38,6 +38,8 @@ impl Default for LnsConfigDocument {
 pub enum RadioBackend {
     Udp,
     Spi,
+    /// Probe for SPI hardware and auto-select SPI if concentrator detected, otherwise UDP.
+    Auto,
 }
 
 /// Optional `[radio]` table in `lns-config.toml`.
@@ -163,6 +165,9 @@ impl LnsConfigDocument {
                                 .to_string(),
                         );
                     }
+                }
+                RadioBackend::Auto => {
+                    // Auto mode: spi_path is optional, will be probed at runtime
                 }
                 RadioBackend::Udp => {}
             }
