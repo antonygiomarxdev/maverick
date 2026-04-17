@@ -33,26 +33,52 @@ systemctl stop maverick-edge.service
 # For release mode: download and replace binary
 if [ "$UPDATE_MODE" = "release" ] && [ -n "$RELEASE_URL" ]; then
   ARCH=$(uname -m)
-  VERSION_URL="$RELEASE_URL/$ARCH/version.txt"
-  BINARY_URL="$RELEASE_URL/$ARCH/maverick-edge-$CURRENT_VERSION"
+  # Map uname -m to release artifact name
+  case "$ARCH" in
+    x86_64) ARTIFACT="maverick-x86_64-unknown-linux-gnu" ;;
+    aarch64) ARTIFACT="maverick-aarch64-unknown-linux-gnu" ;;
+    armv7l) ARTIFACT="maverick-armv7-unknown-linux-gnueabihf" ;;
+    *) log "Unsupported architecture: $ARCH"; exit 1 ;;
+  esac
 
-  # Check version
-  NEW_VERSION=$(curl -sf "$VERSION_URL" || echo "")
-  if [ -n "$NEW_VERSION" ] && [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
-    log "New version available: $NEW_VERSION"
+  # Get latest release version from GitHub API
+  LATEST_VERSION=$(curl -sf "https://api.github.com/repos/antonygiomarxdev/maverick/releases/latest" | grep '"tag_name":' | sed 's/.*"v\?\([^"]*\)".*/\1/' || echo "")
+
+  if [ -z "$LATEST_VERSION" ]; then
+    log "Failed to fetch latest release version"
+  elif [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
+    log "New version available: $LATEST_VERSION (current: $CURRENT_VERSION)"
+
     # Download new binary
     mkdir -p "$DOWNLOAD_DIR"
-    curl -sf "$RELEASE_URL/$ARCH/maverick-edge-$NEW_VERSION" -o "$DOWNLOAD_DIR/maverick-edge-$NEW_VERSION"
+    DOWNLOAD_URL="$RELEASE_URL/v$LATEST_VERSION/${ARTIFACT}.tar.gz"
+    log "Downloading from: $DOWNLOAD_URL"
+    curl -sfL "$DOWNLOAD_URL" -o "$DOWNLOAD_DIR/${ARTIFACT}.tar.gz" || {
+      log "Download failed"
+      systemctl start maverick-edge.service
+      exit 1
+    }
+
+    # Extract
+    mkdir -p "$DOWNLOAD_DIR/extracted"
+    tar -xzf "$DOWNLOAD_DIR/${ARTIFACT}.tar.gz" -C "$DOWNLOAD_DIR/extracted"
+
     # Backup current
     mkdir -p "$BACKUP_DIR"
     cp "$BINARY_PATH" "$BACKUP_DIR/maverick-edge-$CURRENT_VERSION-$(date +%s)"
+
     # Atomic replace
-    mv "$DOWNLOAD_DIR/maverick-edge-$NEW_VERSION" "$BINARY_PATH.new"
-    mv "$BINARY_PATH.new" "$BINARY_PATH"
-    chmod 755 "$BINARY_PATH"
-    log "Binary updated to $NEW_VERSION"
+    if [ -f "$DOWNLOAD_DIR/extracted/maverick-edge" ]; then
+      cp "$DOWNLOAD_DIR/extracted/maverick-edge" "$BINARY_PATH"
+      chmod 755 "$BINARY_PATH"
+      log "Binary updated to $LATEST_VERSION"
+    else
+      log "Extracted binary not found"
+      systemctl start maverick-edge.service
+      exit 1
+    fi
   else
-    log "No new version available"
+    log "Already on latest version: $CURRENT_VERSION"
   fi
 fi
 
