@@ -145,5 +145,35 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3.1. Class A Downlink | 0/TBD | Not started | - |
 | 4. Process Supervision | 0/TBD | Not started | - |
 | 5. TUI Device Management | 0/TBD | Not started | - |
-| 6. Phase 4 Verification & Artifacts | 0/TBD | Not started | - |
-| 7. Phase 5 Verification & Artifacts | 0/TBD | Not started | - |
+| 6. Phase 4 Verification & Artifacts | 1/1 | Complete   | 2026-04-17 |
+| 7. Phase 5 Verification & Artifacts | 1/1 | Complete | 2026-04-17 |
+
+### Phase 8: Hardware Testing (RAK Pi)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 1/1 plans complete
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 8 to break down)
+
+### Phase 9: Hardware Auto-Detection & SPI Enable
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 9 to break down)
+
+### Phase 10: libloragw SPI Integration
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 9
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 10 to break down)
