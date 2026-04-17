@@ -52,10 +52,11 @@ MIC verification and FCnt 32-bit support.
 - MIC verification — validate every uplink before accepting
 - FCnt 32-bit — support full 32-bit frame counter
 - FRMPayload decryption — AES-128 decript in end-device mode
+- Basic security metrics (MIC failures, suspicious activity)
 
 **Exit criteria:**
 - [ ] MIC verification passes for valid frames
-- [ ] MIC verification rejects forged frames
+- [ ] MIC verification rejects forged frames (with warning)
 - [ ] FCnt 32-bit works across rollover boundary
 - [ ] Protocol state machine handles all edge cases
 
@@ -109,7 +110,30 @@ Auto-restart, self-healing, reliability.
 - [ ] Extension failures don't affect core
 - [ ] `maverick-edge health` reports accurate status
 
-## Phase 07: Community-Ready
+## Phase 07: Observability
+**Status:** 🔲 Queued
+
+Comprehensive observability for offline deployments.
+
+**Why:** When you can't SSH into a device in a cornfield, you need local visibility into what's happening.
+
+**Goals:**
+- Metrics collection and storage (uplinks/sec, MIC fails, session count, CPU/RAM)
+- Structured, searchable logs with rotation
+- Security event logging (MIC failures, suspicious activity)
+- Health endpoint for all components
+- `maverick-edge logs` command for local log access
+- Metrics queryable via CLI (`maverick-edge metrics`)
+
+**Exit criteria:**
+- [ ] Metrics stored locally and queryable
+- [ ] Structured logs with rotation (configurable retention)
+- [ ] Security events persisted (MIC failures, etc.)
+- [ ] `maverick-edge health` reports system status
+- [ ] `maverick-edge logs` command works
+- [ ] All observable without internet connectivity
+
+## Phase 08: Community-Ready
 **Status:** 🔲 Queued
 
 Prepare for v1.0 release.
@@ -159,6 +183,7 @@ Before closing each phase, verify:
 - [ ] `cargo fmt` + `cargo clippy` pass
 - [ ] No cloud dependencies in core
 - [ ] Extensions remain isolated
+- [ ] Phase aligns with vision ("LoRaWAN. Offline. Always.")
 
 See: `.planning/QUALITY-CHECKLIST.md`
 
