@@ -1,3 +1,15 @@
+//! ## SPI Adapter — UplinkObservation Parsing Contract
+//!
+//! When integrating libloragw RX (lgw_receive), the SPI adapter MUST:
+//!
+//! 1. Extract `wire_mic = phy_payload[phy_payload.len()-4..]` (last 4 bytes)
+//! 2. Extract `phy_without_mic = &phy_payload[..phy_payload.len()-4]`
+//! 3. Extract DevAddr, FCnt, FPort, payload per LoRaWAN 1.0.x PHY format
+//! 4. Pass ALL of the above to UplinkObservation
+//!
+//! Without `wire_mic` and `phy_without_mic`, MIC verification in IngestUplink
+//! will receive zeros and ALL valid frames will be rejected.
+
 //! `UplinkSource` over SPI — placeholder until libloragw RX is integrated.
 
 use std::time::Duration;
@@ -45,5 +57,36 @@ impl UplinkSource for SpiUplinkSource {
         tokio::task::spawn_blocking(move || Self::blocking_poll(&path, idle))
             .await
             .map_err(|e| AppError::Infrastructure(format!("spi uplink join: {e}")))?
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// SPI Adapter UplinkObservation Parsing Contract.
+    ///
+    /// When libloragw RX is integrated, this module verifies the contract is met:
+    ///
+    /// 1. Parse raw LoRaWAN PHY bytes from the concentrator
+    /// 2. Construct UplinkObservation with fields:
+    ///    - dev_addr: DevAddr — from FHDR bytes [1-4]
+    ///    - f_cnt: u16 — from FHDR bytes [6-7] (wire value)
+    ///    - f_port: u8 — after FHDR + FOpts
+    ///    - payload: Vec<u8> — FRMPayload bytes (between FPort and MIC)
+    ///    - wire_mic: [u8; 4] — last 4 bytes of PHY payload
+    ///    - phy_without_mic: Vec<u8> — PHY payload excluding last 4 bytes
+    ///    - gateway_eui: GatewayEui — from concentrator metadata
+    ///    - region: RegionId — from frequency
+    ///    - rssi: Option<i16>, snr: Option<f32> — from radio metadata
+    ///
+    /// Without wire_mic and phy_without_mic, MIC verification will receive
+    /// zeros and ALL valid frames will be rejected.
+    ///
+    /// IMPLEMENTATION PENDING: This test will be implemented when libloragw
+    /// integration begins.
+    #[test]
+    #[ignore = "pending libloragw integration"]
+    fn spi_adapter_parsing_contract() {
+        // Placeholder — implementation pending libloragw integration
+        // Once real implementation is added, remove #[ignore] and implement test
     }
 }
