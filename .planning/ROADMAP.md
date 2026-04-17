@@ -70,8 +70,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — LoRaWAN spec test vectors for MIC, decryption, FCnt (20 new tests)
-- [ ] 03-02-PLAN.md — Integration tests: UDP adapter MIC extraction, e2e pipeline, SPI contract docs
+- [x] 03-01-PLAN.md — LoRaWAN spec test vectors for MIC, decryption, FCnt (20 new tests)
+- [x] 03-02-PLAN.md — Integration tests: UDP adapter MIC extraction, e2e pipeline, SPI contract docs
 
 ### Phase 3.1: Class A Downlink (INSERTED — deferred from original Phase 3)
 **Goal**: Maverick can send downlinks to Class A devices through both RX windows, with confirmed-uplink ACKs, and the downlink queue survives process restarts
