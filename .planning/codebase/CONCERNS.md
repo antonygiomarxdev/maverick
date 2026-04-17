@@ -1,241 +1,277 @@
-# CONCERNS — Maverick Codebase Map
-_Generated: 2026-04-16_
+# Codebase Concerns
 
-## Summary
+**Analysis Date:** 2026-04-16
 
-Maverick is a young (v0.1.4) edge LoRaWAN runtime with a clean hexagonal architecture and good test coverage for its core use case. The most significant risks are protocol-level: no MIC (Message Integrity Code) verification is performed on uplinks, meaning any device can replay or forge frames against any known DevAddr. Secondary concerns involve the use of `process::exit` throughout the CLI layer (skips Drop), a single-connection SQLite lock under async workloads, and several incomplete placeholder features documented in the codebase but not yet implemented (cloud sync, `recent-errors`, Class B/C devices).
+## Tech Debt
 
----
+### Heavy use of `std::process::exit` bypassing Drop handlers
 
-## Critical Concerns
+**Area:** CLI command handlers
+**Files:**
+- `crates/maverick-runtime-edge/src/commands/config.rs` (31 instances, lines 57, 62, 74, 84, 91, 96, 109, 116, 121, 131, 147, 159, 168, 175, 182, 189, 196, 226, 234, 241, 258, 264, 272, 284, 294, 300, 308, 320)
+- `crates/maverick-runtime-edge/src/commands.rs` (5 instances, lines 54, 89, 97, 103, 105)
+- `crates/maverick-runtime-edge/src/ingest/gwmp_loop.rs` (3 instances, lines 218, 239, 263)
 
-### C1 — No MIC verification on uplink frames
-**Files:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:128–162`, `crates/maverick-core/src/protocol/lorawan_10x_class_a.rs:29–48`
+**Issue:** `std::process::exit(1)` is called directly in ~39 error paths throughout the CLI layer. This bypasses Rust's `Drop` implementations, meaning:
+- SQLite WAL checkpoint may not flush (`crates/maverick-adapter-persistence-sqlite/src/persistence/mod.rs:89-104` documents `close()` must be called before exit)
+- In-flight `spawn_blocking` tasks are abandoned
+- OS-level file flushes may not complete
 
-The GWMP parser extracts DevAddr, FCnt, FPort, and FRMPayload from raw LoRaWAN frames but **never verifies the 4-byte MIC** (Message Integrity Code). The tail 4 bytes are stripped by `parse_lorawan_payload` (line 155–160) without validation. The `validate_uplink` protocol method only checks region, session existence, device class, and that `f_cnt > last_f_cnt`. Any attacker on the same LAN segment who knows a valid DevAddr and sends a frame with a monotonically increasing FCnt will be accepted and persisted as a legitimate uplink. The ABP session keys (`apps_key`, `nwks_key`) are stored in `lns_devices` but are never loaded or used for any crypto operation.
+**Impact:** On write-heavy operations (e.g., `config load`), a kill signal or error could leave WAL frames uncheckpointed. The `SqlitePersistence::close()` method exists specifically to address this (RELI-02), but is never called because CLI exits bypass Drop.
 
-**Impact:** All uplink authentication is bypassed. This is a deliberate V1 limitation per code comments ("Optional ABP session keys; not required for ingest until downlink/crypto is wired") but must be clearly gated before any production deployment.
-
-**Fix approach:** Wire `NwkSKey` through `ProtocolContext`, compute AES-CMAC over the frame header+payload, and compare against the last 4 bytes before calling `ProtocolDecision::Accept`.
-
----
-
-### C2 — FCnt is only 16 bits wide in the GWMP parser but stored as 32 bits
-**File:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:139–140`
-
-```rust
-let fcnt =
-    u16::from_le_bytes([raw[LORAWAN_FHDR_FCNT_START], raw[LORAWAN_FHDR_FCNT_END - 1]]) as u32;
-```
-
-The LoRaWAN spec uses a 16-bit over-the-air FCnt with a 32-bit server-side counter maintained by incrementing the upper 16 bits on wrap. The current code parses only the lower 16 bits and casts to u32; the upper 16 bits are always zero. Once a device wraps its FCnt past 0xFFFF the ingest will reject every subsequent frame as a duplicate (because `obs.f_cnt <= session.uplink_frame_counter`), permanently bricking the session without any rollover logic.
-
-**Impact:** Devices with more than 65535 uplinks silently stop being ingested. No error is surfaced beyond a `rejected:RejectDuplicateFrameCounter` audit entry.
-
-**Fix approach:** Track and reconstruct the upper half from session state (standard LNS approach), or at minimum reject with a distinct error so operators can diagnose the session.
+**Fix approach:** Return `Result<(), AppError>` from command handlers and call `std::process::exit` only at the `main` boundary after proper cleanup.
 
 ---
 
-### C3 — UDP socket binds to `0.0.0.0:17000` by default with no authentication
-**Files:** `crates/maverick-runtime-edge/src/cli_constants.rs`, `crates/maverick-extension-tui/src/config.rs:14`
+### Large file complexity — `lns_ops.rs` at 502 lines
 
-The default GWMP bind is `0.0.0.0:17000`. GWMP/UDP has no built-in authentication; any host that can reach this port can inject frames. On a Raspberry Pi connected to the internet (typical edge deployment) this means the ingest loop accepts arbitrary LoRaWAN-shaped datagrams from any source IP.
+**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/lns_ops.rs`
 
-**Impact:** Combined with C1 (no MIC), this is an open uplink injection vector. The autoprovision path (`lns_guard.rs`) will create pending rows for any unseen DevAddr at up to 10 per gateway per minute by default, allowing storage exhaustion via crafted datagrams at a moderate rate.
+**Issue:** Single file contains LNS config sync, pending device management, application/device listing, and session management. The `apply_lns_config_inner` function (lines ~288-450) has 12+ `.expect("validated lns config")` calls that assume prior validation.
 
-**Fix approach:** Document clearly that GWMP must be firewalled to localhost only. Consider defaulting bind to `127.0.0.1:17000`. The rate limiter in `lns_guard.rs` mitigates but does not prevent flooding.
+**Impact:** If validation is ever skipped via refactor, these `.expect` calls panic inside `spawn_blocking`, poisoning the SQLite Mutex and bricking persistence for the process lifetime.
 
----
-
-## Moderate Concerns
-
-### M1 — `std::process::exit` called throughout CLI handlers; Drop implementations skipped
-**Files:** `crates/maverick-runtime-edge/src/commands/config.rs` (lines 57, 64, 73, 85, 94, 108, 114, 120, 131, 148, 159, 164, 172, 178, 183, 190, 196, 258, 265, 274, 285, 295, 303, 311), `crates/maverick-runtime-edge/src/commands.rs` (lines 51, 55, 89, 95)
-
-`std::process::exit(1)` is used directly in ~25 CLI error paths rather than propagating errors and letting `main` decide. This means SQLite's WAL checkpoint, any in-flight `spawn_blocking` tasks, and OS-level file flushes may not complete cleanly on error. Rust's `Drop` implementations are bypassed.
-
-**Impact:** On a write-heavy operation like `config load` that's partway through a transaction, a kill signal or error exit is less likely to corrupt SQLite due to WAL atomicity, but accumulated dirty pages may not be checkpointed. More importantly it makes testability of CLI commands difficult.
-
-**Fix approach:** Return `Result<(), String>` from command handlers and call `std::process::exit` only at the `main` boundary.
+**Fix approach:** Extract functions, propagate errors properly, remove `.expect` calls.
 
 ---
 
-### M2 — Single shared `Mutex<Connection>` serializes all SQLite I/O
+### Large file complexity — `ingest_uplink.rs` at 423 lines
+
+**File:** `crates/maverick-core/src/use_cases/ingest_uplink.rs`
+
+**Issue:** Contains session lookup, MIC verification, payload decryption, and uplink record creation in a single large module. Test mocks use `tokio::sync::Mutex` patterns that don't mirror production behavior.
+
+**Impact:** Hard to test individual concerns in isolation. The `expect("session confirmed present before this point")` at line 167 creates an implicit assumption about prior validation.
+
+---
+
+### Large file complexity — `lns_config.rs` at 453 lines
+
+**File:** `crates/maverick-core/src/lns_config.rs`
+
+**Issue:** Declarative config parsing, TOML deserialization, and validation mixed together. Contains multiple `.expect("valid abp")` / `.expect("valid otaa")` / `.expect("spi path set")` calls (lines 342, 367, 451).
+
+**Impact:** Validation failures in production will panic instead of returning user-friendly errors.
+
+---
+
+## Known Bugs
+
+### Region inference has shadowed match arms — AU915/AS923 unreachable
+
+**File:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:164-173`
+
+**Symptoms:** AU915 (915-928 MHz) and AS923 (920-923.5 MHz) are entirely within US915 (902-928 MHz). The US915 match arm `if (902.0..=928.0).contains(&v)` matches first, making AU915/AS923 unreachable.
+
+**Trigger:** Devices configured with AU915 or AS923 regions send uplinks with frequencies in those ranges.
+
+**Workaround:** None — these devices will be misidentified as US915 and rejected with `RejectRegionMismatch`.
+
+---
+
+### FCnt rollover not handled — devices brick after 65535 uplinks
+
+**File:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:139-140`
+
+**Symptoms:** Only lower 16 bits of FCnt are parsed; upper 16 bits are always zero. Once `f_cnt > 0xFFFF`, every subsequent frame is rejected as `RejectDuplicateFrameCounter`.
+
+**Trigger:** High-volume devices crossing the 64K uplink boundary.
+
+**Workaround:** None — session becomes permanently non-functional.
+
+---
+
+### Zero-value default session keys on ABP device approval
+
+**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/lns_ops.rs:95-96`
+
+**Symptoms:** When approving a pending device, if no existing session is found, the code uses `unwrap_or([0u8; 16])` for both `nwk_s_key` and `app_s_key`. This means ABP devices without a prior session get all-zero session keys.
+
+**Trigger:** Using `config approve-device` for an ABP device that has no existing session in the database.
+
+**Workaround:** Ensure the device has already communicated (creating a session with proper keys) before approval.
+
+---
+
+## Security Considerations
+
+### No MIC verification on uplink frames
+
+**Files:**
+- `crates/maverick-adapter-radio-udp/src/gwmp.rs` (MIC bytes stripped at line 155-160)
+- `crates/maverick-core/src/protocol/lorawan_10x_class_a.rs` (validation only checks region/session/class/FCnt)
+
+**Risk:** Any attacker on the same LAN segment who knows a valid DevAddr can forge uplinks with incrementing FCnt. Combined with C3 (UDP binding), this is an open injection vector.
+
+**Current mitigation:** Autoprovision rate limiting (10/minute/gateway) in `lns_guard.rs` limits flood rate.
+
+**Recommendations:**
+- Document that GWMP/UDP must be firewalled to localhost only
+- Default bind address should be `127.0.0.1:17000` (SEC-01 change noted in `cli_constants.rs:28`)
+- Wire MIC verification before any production deployment
+
+---
+
+### Default GWMP bind changed from 0.0.0.0 to 127.0.0.1 (SEC-01)
+
+**File:** `crates/maverick-runtime-edge/src/cli_constants.rs:28-32`
+
+**Note:** The comment indicates this was a deliberate security fix. The default bind is now loopback-only, requiring explicit `0.0.0.0:17000` override for external packet forwarders.
+
+---
+
+### Unsafe code allowed with warnings only
+
+**File:** `Cargo.toml:50`
+
+**Issue:** `unsafe_op_in_unsafe_fn = "warn"` allows unsafe code blocks without failing CI. While no `unsafe` blocks were found in the codebase, the linter configuration permits them.
+
+**Recommendations:** Consider upgrading to `unsafe_op_in_unsafe_fn = "deny"` if the project wants to eliminate unsafe code entirely.
+
+---
+
+## Performance Bottlenecks
+
+### Single Mutex<Connection> serializes all SQLite I/O
+
 **File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/mod.rs:52`
 
-```rust
-pub(super) conn: std::sync::Mutex<Connection>,
-```
+**Problem:** All reads and writes share one `std::sync::Mutex<Connection>`. Under burst traffic, this creates a thundering herd on the lock.
 
-All reads and writes (sessions, uplinks, audit, config, pressure snapshot) share one `std::sync::Mutex<Connection>`. Every async path calls `run_blocking` which dispatches to `spawn_blocking`. Under load this creates a thundering herd on the lock and wastes Tokio thread-pool threads waiting for the mutex rather than doing real work. The busy-retry layer in `busy.rs` adds additional latency on top.
+**Impact:** Health checks (`pressure_snapshot_blocking`) can block ingest. High message rates will serialize writes and degrade latency.
 
-**Impact:** At very low message rates (typical edge) this is fine. Any burst (many devices, or supervised `ingest-loop` processing many datagrams rapidly) will serialize all writes and degrade latency significantly. The pressure snapshot path (`pressure_snapshot_blocking`) also acquires the same lock, meaning a health check can block ingest.
-
-**Fix approach:** Pool read-only connections separately from the writer, or use `rusqlite`'s connection pool via `r2d2-sqlite`. At minimum, separate the pressure snapshot read connection.
+**Improvement path:** Pool read-only connections separately from the writer, or use `r2d2-sqlite`.
 
 ---
 
-### M3 — `expect("validated lns config")` panics in `apply_lns_config_inner` defeat the error contract
-**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/lns_ops.rs:288–400`
+### Filesystem stat on every write
 
-The internal function `apply_lns_config_inner` contains 12+ `.expect("validated lns config")` and `.expect("validated")` calls on hex-parsing operations. These are guarded by a prior call to `doc.validate()` at line 21, creating an implicit assumption that validation is always called first. However, `apply_lns_config_inner` is a private function and the guarantee is non-local. If validation is ever skipped (e.g., via a future refactor calling the inner function directly), this panics in a blocking task, poisoning the Mutex and bricking the persistence layer for the process lifetime.
+**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/mod.rs:83-87`
 
-**Impact:** A panic in `spawn_blocking` or a synchronous call inside the mutex will poison it. `run_with_busy_retry` already handles `Mutex::lock` returning `Err(_)` by returning `AppError::Infrastructure`, but all subsequent operations on that `SqlitePersistence` instance will then always fail.
+**Problem:** `db_file_bytes()` calls `std::fs::metadata` inside the SQLite lock after every write to check storage pressure.
 
-**Fix approach:** Return `Result` from `apply_lns_config_inner`, propagate errors, and remove the `.expect` calls.
+**Impact:** Adds syscall latency on the hot ingest path.
 
----
-
-### M4 — `recent-errors` command is a stub; no structured log persistence exists
-**Files:** `crates/maverick-runtime-edge/src/cli_constants.rs` (constant `RECENT_ERRORS_NOT_WIRED_MESSAGE`), `crates/maverick-runtime-edge/src/commands.rs:201–210`
-
-The `recent-errors` command returns a hardcoded stub response indicating that log tailing is not yet wired. There is no log file, ring buffer, or structured error sink beyond the audit table in SQLite. Operators relying on this for diagnostics get no actionable output.
-
-**Impact:** Debugging production issues requires access to stderr/journald logs directly; the CLI surface is incomplete. Documented as a "v1 placeholder" in command help text ("placeholder" appears in the CLI doc comment).
+**Improvement path:** Cache file size and invalidate periodically or only on pruning paths.
 
 ---
 
-### M5 — `infer_region` from frequency has overlapping and ambiguous ranges
-**File:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:164–173`
+### Rate-limit bucket uses process-global static
 
-```rust
-fn infer_region(freq_mhz: Option<f64>) -> RegionId {
-    match freq_mhz {
-        Some(v) if (863.0..=870.0).contains(&v) => RegionId::Eu868,
-        Some(v) if (902.0..=928.0).contains(&v) => RegionId::Us915,
-        Some(v) if (915.0..=928.0).contains(&v) => RegionId::Au915,   // shadowed by Us915
-        Some(v) if (920.0..=923.5).contains(&v) => RegionId::As923,   // shadowed by Us915
-        Some(v) if (923.0..=925.0).contains(&v) => RegionId::As923,   // also shadowed
-        _ => RegionId::Eu868,                                           // silent default
-    }
-}
-```
+**File:** `crates/maverick-runtime-edge/src/ingest/lns_guard.rs:21-22`
 
-AU915 (915–928 MHz) and AS923 (920–923.5 MHz) are both entirely contained within the US915 match arm (902–928 MHz). They can never be reached. Additionally, when `freq` is `None` (field missing from GWMP JSON), the function silently defaults to `Eu868` rather than returning an error or unknown region.
+**Problem:** `static BUCKET: OnceLock<Mutex<HashMap<GatewayMinuteKey, u32>>>` is shared across all concurrent ingest workers and test cases.
 
-**Impact:** Devices configured as AU915 or AS923 will have their region misidentified as US915. The region mismatch will then cause `validate_uplink` to return `RejectRegionMismatch` if the session has the correct region, silently dropping all their uplinks.
-
-**Fix approach:** Re-order match arms from most-specific to least-specific, or use explicit frequency channel plans per region. Return a `Result` when `freq` is absent rather than defaulting.
+**Impact:** Rate limits accumulate across logical test boundaries, causing non-deterministic test behavior. In production, process restart resets all state.
 
 ---
 
-### M6 — Rate-limit bucket uses process-global static; survives across logical test boundaries
-**File:** `crates/maverick-runtime-edge/src/ingest/lns_guard.rs:21–36`
+## Fragile Areas
 
-```rust
-static BUCKET: OnceLock<Mutex<HashMap<GatewayMinuteKey, u32>>> = OnceLock::new();
-```
+### `infer_region` silently defaults to EU868 for unknown frequencies
 
-The autoprovision rate-limit state is stored in a `OnceLock`-backed static. This is shared across all test cases in the same process and across all concurrent ingest workers. Rate limits accumulated by one test cannot be cleared by another, making tests that rely on rate-limiting non-deterministic when run in parallel or sequentially without process restart.
+**File:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:164-173`
 
-**Impact:** Test isolation issue; could cause intermittent test failures. In production, a process restart resets all rate-limit state, which may be intentional, but it is undocumented.
+**Why fragile:** When GWMP JSON lacks a `freq` field, the function returns `Eu868` silently instead of an error. This causes all uplinks with missing frequency to be processed as EU868, potentially misclassifying devices.
 
----
-
-### M7 — Cloud sync is entirely unimplemented; `maverick-cloud-core` is a one-trait stub
-**File:** `crates/maverick-cloud-core/src/lib.rs`
-
-The `HubSyncIngest` trait body contains a doc comment "implementation in v1.x". The `SyncBatchEnvelopeV1` struct in `maverick-extension-contracts` has no callers that populate it with real data. There is no edge-to-hub sync path, no store-and-forward queue, and no dedup logic.
-
-**Impact:** If cloud sync is mentioned in user-facing documentation or marketing, it must be clearly gated as not-yet-implemented. The extension contracts create a stable wire format but nothing produces or consumes it.
+**Safe modification:** Change return type to `Result<RegionId, AppError>` and propagate missing frequency as an error.
 
 ---
 
-## Minor / Tech Debt
+### Session lookup assumes validation already occurred
 
-### T1 — `expect` calls in test helper code will produce confusing panics on CI
-**Files:** `crates/maverick-adapter-radio-udp/src/gwmp.rs:187,210`, `crates/maverick-adapter-radio-udp/src/resilient.rs:349`, `crates/maverick-adapter-radio-udp/src/udp_downlink.rs:60,61,65,71,77,79,87,88,97,109`
+**File:** `crates/maverick-core/src/use_cases/ingest_uplink.rs:167`
 
-Several `expect()` calls exist inside test helpers and test setup code. These are acceptable in tests but the ones in `udp_downlink.rs` are in the production implementation body (`bind_ephemeral`, `recv_and_ack`). If `UdpSocket::bind` fails (port already in use, permission denied), the process panics rather than returning an error.
+**Why fragile:** `let session = session.expect("session confirmed present before this point")` creates a non-local assumption that `validate_uplink` was called and succeeded. If called out of order, this panics.
 
-**Fix approach:** Return `AppResult` from `bind_ephemeral` and propagate errors instead of calling `.expect`.
-
----
-
-### T2 — `db_file_bytes()` calls `std::fs::metadata` on every write, inside the SQLite lock
-**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/mod.rs:83–87`, `crates/maverick-adapter-persistence-sqlite/src/persistence/pruning.rs:63`
-
-`prune_hard_limit_circular_sql` calls `self.db_file_bytes()` which does a filesystem `stat` syscall. This happens after every write (after every append, upsert, and audit emit). The `db_file_bytes` call also occurs inside the async task that holds the Mutex, adding unnecessary syscall latency on the hot ingest path.
-
-**Fix approach:** Cache the file size value and invalidate periodically, or sample it only on the pruning path at a low frequency.
+**Safe modification:** Use `ok_or_else` with a descriptive error instead of `expect`.
 
 ---
 
-### T3 — `apply_lns_config_inner` calls `prune_sessions_lru_sql` and `prune_hard_limit_circular_sql` on `conn` after `tx.commit()`
-**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/lns_ops.rs:443–446`
+### Supervised ingest loop has no database reconnection logic
 
-After `tx.commit()` at line 443, the function calls pruning on the same `conn`. This means pruning happens in a separate implicit transaction after the config load commit. If the process dies between the commit and the pruning calls, the database is left with slightly more rows than the policy allows. This is unlikely to cause data loss but violates the atomicity intent.
+**File:** `crates/maverick-runtime-edge/src/ingest/gwmp_loop.rs:193-216`
 
----
+**Why fragile:** `SqlitePersistence` is opened once before the loop. If the database file is deleted or corrupted during the run, the loop continues with a stale handle. No reconnect logic exists.
 
-### T4 — `hex_upper_8` in `lns_ops.rs` silently returns an error string for malformed data
-**File:** `crates/maverick-adapter-persistence-sqlite/src/persistence/lns_ops.rs:201–209`
-
-```rust
-fn hex_upper_8(bytes: &[u8]) -> String {
-    if bytes.len() != 8 {
-        return format!("invalid_len_{}", bytes.len());
-    }
-```
-
-When `dev_eui` bytes stored in SQLite have unexpected length, this returns a sentinel string `"invalid_len_N"` instead of propagating an error. This string will appear in CLI `list-devices` JSON output without any indication that the row is malformed.
+**Safe modification:** Add periodic health checks and reconnection on errors.
 
 ---
 
-### T5 — `run_radio_ingest_supervised` opens the SQLite database once before the receive loop
-**File:** `crates/maverick-runtime-edge/src/ingest/gwmp_loop.rs:193–216`
+## Scaling Limits
 
-The supervised ingest loop opens `SqlitePersistence` once at startup. If the database file is deleted or corrupted during the run (e.g., by a concurrent `config load` gone wrong), the loop continues with a stale handle. The WAL mode mitigates corruption, but there is no reconnect logic.
+**Resource: Session count**
 
----
+The LRU pruning query (`sql_prune_sessions_lru`) performs a full table scan because `updated_at_ms` has no index. For constrained profiles (hundreds of sessions), this is acceptable. High-capacity profiles with thousands of sessions will see degraded write performance.
 
-### T6 — `serde_json::to_string(&out).expect("ingest result")` repeated ~15 times
-**Files:** `crates/maverick-runtime-edge/src/ingest/gwmp_loop.rs:46,65,78,99,137,163,188,212,295`, `crates/maverick-runtime-edge/src/commands.rs:139,198,208,222,231,241,254,261`
+**Resource: UDP packet rate**
 
-The pattern `serde_json::to_string(&out).expect("X json")` appears approximately 20 times across two files. Serializing a known-good struct to JSON should never fail, making these `expect` calls correct in practice, but the repetition is noisy. This could be extracted into a helper (e.g., `print_json_line`).
+Single-threaded GWMP receiver in `gwmp_loop.rs`. Very high packet rates (>1000/sec) will serialize in the single ingest loop. Consider parallelizing by gateway EUI if needed.
 
 ---
 
-### T7 — No `updated_at_ms` index on `sessions` table; LRU pruning is a full table scan
-**File:** `crates/maverick-adapter-persistence-sqlite/src/schema.sql`
+## Dependencies at Risk
 
-The `sessions` table has `dev_addr` as primary key and no secondary index on `updated_at_ms`. The LRU pruning query (`sql_prune_sessions_lru`) orders by `updated_at_ms ASC` without an index, which becomes a full table scan as session count grows. For the constrained profile (max_records_critical ≈ low hundreds) this is fine; for the high-capacity profile with thousands of sessions it will slow every write.
+**rusqlite 0.33 (bundled)**
 
-**Fix approach:** Add `CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at_ms);` to `schema.sql`.
-
----
-
-### T8 — `total_disk_bytes_hint` returns the first disk with non-zero space, not the disk containing the data dir
-**File:** `crates/maverick-runtime-edge/src/probe.rs:63–66`
-
-```rust
-disks.iter().map(|d| d.total_space()).find(|t| *t > 0)
-```
-
-On a system with multiple disks (e.g., SD card + USB stick), this returns whichever disk is enumerated first with non-zero capacity. If the data directory is on `/var/lib/maverick` (typically the SD card) but the first enumerated disk is the USB stick, storage pressure ratios will be computed against the wrong capacity.
+The `rusqlite` crate with bundled SQLite is a single dependency for all persistence. While well-maintained, any SQLite issues affect the entire persistence layer. The `bundled` feature ensures a consistent SQLite version but may lag behind security patches in system SQLite libraries.
 
 ---
 
-## Gaps / Unknowns
+## Missing Critical Features
 
-### G1 — No OTAA join procedure; OTAA devices cannot actually join
-`ActivationMode::Otaa` is stored in `lns_devices` with `join_eui` and `app_key`, but there is no Join Request / Join Accept handler. OTAA devices listed in `lns-config.toml` only become functional if their `dev_addr` is also manually provided (pre-provisioned). The field is documented as "omit for OTAA until a session exists" but no mechanism populates the session automatically.
+**Cloud sync not implemented**
 
-### G2 — `maverick-cloud-core` crate is a workspace member but has no reverse dependencies
-The `maverick-cloud-core` crate is compiled as part of the workspace but nothing depends on it at runtime. It adds build time and artifact surface without delivering functionality. Its presence may confuse contributors about the v1 scope.
+`crates/maverick-cloud-core/src/lib.rs` contains only a stub trait (`HubSyncIngest`) with no implementation. `SyncBatchEnvelopeV1` in `maverick-extension-contracts` has no callers producing or consuming real data.
 
-### G3 — `recent-errors` command stub message references "structured logs live on disk in full impl" but no log file path is defined
-The in-code comment says logs will "live on disk in full impl" but there is no `log_path`, log rotation, or log directory constant defined anywhere in `maverick-runtime-edge`. If this feature is planned, its storage location and format should be specified before the next slice.
+**No downlink scheduling**
 
-### G4 — `DeviceClass::ClassB` and `ClassC` exist in the domain model but are never handled
-`crates/maverick-domain/src/session.rs:8–11` defines all three device classes. `LoRaWAN10xClassA::validate_uplink` returns `RejectUnsupportedClass` for anything other than ClassA. No other protocol capability module exists. Storing ClassB/C devices in config will result in silent perpetual rejection with no useful operator message.
+`UdpDownlinkTransport` exists in `crates/maverick-adapter-radio-udp/src/udp_downlink.rs` but is never wired into the ingest path. Class A Rx1/Rx2 downlink cannot be triggered in response to uplinks.
 
-### G5 — `UdpDownlinkTransport` is implemented and tested but never wired into the ingest loop
-`crates/maverick-adapter-radio-udp/src/udp_downlink.rs` implements a UDP downlink sender. The `IngestUplink` use case has no `RadioTransport` port — downlink is disconnected from the ingest path. The `DownlinkProbe` CLI command exercises transport independently but there is no way to schedule or trigger a Class A Rx1/Rx2 downlink in response to an uplink.
+**No OTAA join procedure**
 
-### G6 — No schema migration for `lns_meta` when upgrading from pre-autoprovision databases
-`migrate_legacy_columns` (`sql.rs:32–36`) adds `application_id` columns to old databases. `migrate_lns_devices_v2` handles the `activation_mode` column addition. However, there is no migration for `lns_meta` if it doesn't exist (it's created on first `config load`). A database from an installation that never ran `config load` before upgrading will have `lns_meta` absent; `read_lns_meta` returns defaults in that case, so behavior is correct, but this is implicit and undocumented.
+`ActivationMode::Otaa` is stored but no Join Request/Join Accept handler exists. OTAA devices cannot complete the join flow automatically.
+
+**recent-errors stub**
+
+`crates/maverick-runtime-edge/src/cli_constants.rs:18` defines `RECENT_ERRORS_NOT_WIRED_MESSAGE`. No log file, ring buffer, or structured error sink exists beyond SQLite audit table.
 
 ---
 
-_Concerns audit: 2026-04-16_
+## Test Coverage Gaps
+
+**Untested: MIC verification failure path**
+
+The `ingest_uplink.rs` module tests happy-path uplink processing but doesn't appear to test the MIC invalid rejection path with a live `IngestUplink` service (only unit tests with mock stores).
+
+**Untested: Session rollover at FCnt boundary**
+
+No test exercises the FCnt 0xFFFF → 0x10000 transition. The `RejectDuplicateFrameCounter` path is covered only by protocol-level unit tests, not end-to-end.
+
+**Untested: Database recovery after panic**
+
+If `spawn_blocking` panics (e.g., from `.expect` in lns_ops), the Mutex poisons. No test verifies recovery behavior after a poisoned persistence layer.
+
+**Untested: Class B/C device handling**
+
+`DeviceClass::ClassB` and `ClassC` exist in domain model but are never tested. `validate_uplink` returns `RejectUnsupportedClass` for them, but no integration test verifies operator experience when these devices are configured.
+
+---
+
+## Observations
+
+**Good patterns:**
+- No TODO/FIXME/HACK comments found — codebase appears well-maintained
+- `thiserror` derive for error types (`crates/maverick-core/src/error.rs`)
+- Circuit breaker pattern in `resilient.rs` with proper half-open state
+- SQLite WAL mode provides atomic write safety
+- `tracing` for structured logging in hot paths
+
+**Patterns requiring attention:**
+- 102 `expect()` / `unwrap()` calls across codebase (many in test code, but production code in `gwmp.rs`, `udp_downlink.rs` uses them in socket operations)
+- `panic = "abort"` in release profile means any panic terminates immediately without stack unwinding
+- Error messages use stringly-typed `AppError::Infrastructure(format!(...))` rather than structured variants
+
+---
+
+*Concerns audit: 2026-04-16*

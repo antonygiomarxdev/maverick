@@ -1,121 +1,161 @@
 # Maverick
 
-Offline-first LoRaWAN edge runtime focused on reliability in unstable networks.
+**LoRaWAN. Offline. Always.**
 
-[![CI](https://github.com/antonygiomarxdev/maverick/actions/workflows/ci.yml/badge.svg)](https://github.com/antonygiomarxdev/maverick/actions/workflows/ci.yml)
-[![Release](https://github.com/antonygiomarxdev/maverick/actions/workflows/release.yml/badge.svg)](https://github.com/antonygiomarxdev/maverick/actions/workflows/release.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-public%20beta-orange.svg)](docs/release-policy.md)
+*Self-contained LoRaWAN gateway + network server for edge deployments where connectivity is unreliable or nonexistent.*
 
-## Project status
+[Install](#install) · [Quick Start](#quick-start) · [Why Maverick](#why-maverick) · [Extensions](#extensions) · [Community](#community)
 
-Maverick is in **public beta**: behavior and operator surfaces may still change. We **version from every tagged release** using SemVer git tags `v0.x.y`. The `0.x` line means pre-1.0; **`1.0.0` will mark the first “stable” line** once we intentionally graduate.
+---
 
-Install and operate from **GitHub Releases** (or GHCR tags that match the same version), not from arbitrary `main` SHAs, unless you are developing the project.
+## What is this?
+
+Maverick is a **gateway and LoRaWAN network server in one binary**. It runs on a Raspberry Pi in the middle of a cornfield, reads packets from a SX1302/SX1303 radio over SPI, stores everything in local SQLite — and keeps working even when the satellite link goes down for three days.
+
+No cloud required. No external dependencies. Your data is on that device until you decide otherwise.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Raspberry Pi (edge)                                      │
+│  ┌────────────────┐     ┌─────────────────────────────┐  │
+│  │   SX1303 HAT    │────▶│        maverick-edge        │  │
+│  │   (radio)       │     │  gateway + LNS + SQLite    │  │
+│  └────────────────┘     └─────────────────────────────┘  │
+│                                      │                   │
+│                          Extensions: TUI, HTTP, MQTT, AI│
+└──────────────────────────────────────────────────────────┘
+                                      │
+                                      │ when connected
+                                      ▼
+                               Maverick Cloud (future)
+```
 
 ## Why Maverick
 
-Maverick keeps gateway operations running locally when connectivity is weak or absent. The runtime is designed for small Linux gateways, with strict architectural boundaries and resilient behavior under recoverable failures.
+| | Traditional LNS | Maverick |
+|---|---|---|
+| Requires internet | Yes | No |
+| Runs on Raspberry Pi | Needs gateway + server | Single binary |
+| Data if offline | Lost | Persists locally |
+| Extension crash | May affect LNS | Isolated |
+| Setup complexity | High | `curl ... | bash` |
 
-Core principles:
+Works with existing packet forwarders too (UDP/GWMP), if you already have gateway hardware.
 
-- offline-first local truth,
-- no mandatory cloud dependency in the runtime path,
-- core/kernel isolated from adapters,
-- simple operator surface with CLI by default.
+## Quick Start
 
-## Current scope (v1 baseline)
-
-- Local edge runtime binary: `maverick-edge`
-- Optional terminal extension: **Maverick console** (binary `maverick-edge-tui`, public command `maverick` via symlink)
-- GWMP ingest path with supervised loop mode
-- Resilience features (timeouts, retries, backoff, circuit behavior)
-- SQLite-backed persistence and storage-pressure visibility
-- Release artifacts for Linux targets + GHCR image publication
-
-## Install (Linux-first)
-
-Official path is native Linux binaries from GitHub Releases.
-
-- Full guide: [`docs/install.md`](docs/install.md)
-- Installer script: `scripts/install-linux.sh`
-- Optional extension: Maverick console / `maverick` (CLI remains default)
-
-Quick install (one command):
+### Install (one command)
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh" | bash -s -- --version latest --install-dir /usr/local/bin
+curl -fsSL https://raw.githubusercontent.com/antonygiomarxdev/maverick/main/scripts/install-linux.sh | bash
 ```
 
-The installer follows standard Linux bootstrap behavior: it auto-detects common package managers (`apt-get`, `dnf`, `yum`, `apk`, `pacman`, `zypper`), installs missing prerequisites when possible, validates binaries, then runs a **first-run onboarding wizard** (unless `--skip-onboarding`).
-
-Setup behavior after install:
-
-- **Interactive TTY (default):** 4-step wizard (data dir → GWMP bind/loop policy → smoke checks → extensions). Writes `/etc/maverick/runtime.env`, `/etc/maverick/setup.json`, and syncs `~/.config/maverick/`. Creates `maverick` → `maverick-edge-tui` symlink when the console binary is present.
-- **`--non-interactive`:** same files using environment defaults (see `docs/install.md`).
-- **`--skip-onboarding`:** binaries only; no `/etc/maverick` writes.
-- Re-run console setup anytime: `maverick setup` or `maverick-edge-tui setup` (legacy name). `maverick-edge setup` delegates to the console binary.
-
-Requires a published [GitHub Release](https://github.com/antonygiomarxdev/maverick/releases); if `curl` returns `404`, there is no release yet (use source build below or wait for `v0.x.y`). See [`docs/install.md`](docs/install.md) for a save-then-run alternative if you do not want to pipe to `bash`.
-
-## Quick start (source build)
+Or manual:
 
 ```bash
-cargo build --workspace
-cargo test --workspace
-cargo run -p maverick-runtime-edge --bin maverick-edge -- health
-cargo run -p maverick-runtime-edge --bin maverick-edge -- status
-export MAVERICK_DATA_DIR="./data"
-cargo run -p maverick-runtime-edge --bin maverick-edge -- storage-pressure
-cargo run -p maverick-runtime-edge --bin maverick-edge -- radio ingest-loop --bind 0.0.0.0:17000 --read-timeout-ms 1000 --max-messages 1000
+# Download from releases
+wget https://github.com/antonygiomarxdev/maverick/releases/latest/download/maverick-edge-linux-armv7.tar.gz
+tar -xzf maverick-edge-linux-armv7.tar.gz
+sudo mv maverick-edge /usr/local/bin/
+
+# Run setup (interactive)
+maverick-edge setup
 ```
 
-## Releases and versioning
+### Verify
 
-- Tags follow `vX.Y.Z` (example: `v0.1.0`; during beta the major stays `0`)
-- Each tagged release publishes Linux tarballs with:
-  - `maverick-edge`
-  - `maverick-edge-tui`
-  - checksum files (`.sha256`)
-- Container image published to `ghcr.io/antonygiomarxdev/maverick`
-- During v1.x, core and extension binaries are version-locked by release tag
-
-Policy details: [`docs/extensions.md`](docs/extensions.md)
-
-Release process and checklist: [`docs/release-policy.md`](docs/release-policy.md)
-
-## Repository map
-
-```text
-crates/
-  maverick-domain/               # entities and value objects (no I/O)
-  maverick-core/                 # use cases and ports
-  maverick-runtime-edge/         # maverick-edge binary
-  maverick-extension-tui/        # optional console binary (maverick-edge-tui; public name: maverick)
-  maverick-extension-contracts/  # versioned extension/sync contracts
-  maverick-adapter-radio-udp/    # UDP transport + GWMP parser
-  maverick-adapter-persistence-sqlite/ # sqlite persistence adapters
-  maverick-cloud-core/           # cloud-side core contracts
-  maverick-integration-tests/    # cross-crate integration tests
+```bash
+maverick-edge health
+maverick-edge status
 ```
 
-## Documentation
+### Configure
 
-Start here:
+Edit `/etc/maverick/lns-config.toml` to add your devices and region. Then:
 
-- [`docs/README.md`](docs/README.md) - canonical docs index
-- [`ROADMAP.md`](ROADMAP.md) - now/next/later board
-- [`docs/runbook-edge.md`](docs/runbook-edge.md) - operator runbook
-- [`docs/01-execution-plan.md`](docs/01-execution-plan.md) - implementation slices
+```bash
+maverick-edge radio ingest-loop
+```
 
-## Contributing
+That's it. Uplinks go to SQLite. Connect a dashboard extension when you're ready.
 
-Contributions are welcome. Read:
+## Extensions
 
-- [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
-- [`SECURITY.md`](SECURITY.md)
+Everything is optional. Default install is just `maverick-edge` — nothing else.
+
+| Extension | When you need it |
+|-----------|------------------|
+| [`maverick-tui`](https://github.com/antonygiomarxdev/maverick/tree/main/crates/maverick-extension-tui) | Terminal console for device management |
+| [`maverick-dashboard`](https://github.com/antonygiomarxdev/maverick) (future) | Web UI for visualization |
+| [`maverick-http`](https://github.com/antonygiomarxdev/maverick) (future) | Forward uplinks via HTTP webhooks |
+| [`maverick-mqtt`](https://github.com/antonygiomarxdev/maverick) (future) | Publish to MQTT broker |
+| [`maverick-ai`](https://github.com/antonygiomarxdev/maverick) (future) | Anomaly detection, AI analytics |
+
+Extensions are **separate processes**. If one crashes, `maverick-edge` keeps running.
+
+## Architecture
+
+```
+maverick-edge
+┌────────────────────────────────────────────────────────────┐
+│  Radio SPI  │  SQLite  │  CLI  │  Extension IPC           │
+│  (SX1302/3) │ (local)  │       │  (HTTP, Unix socket)     │
+└────────────────────────────────────────────────────────────┘
+       │                                      │
+       ▼                                      ▼
+  LoRa Frames                          Extensions
+  (uplinks ↓                           (optional)
+   downlinks ↑)
+```
+
+## Status
+
+**Public beta** — v0.x. Core ingest path works. Extensions are being built.
+
+Roadmap: [ROADMAP.md](ROADMAP.md)
+
+## Install Options
+
+| Method | Use case |
+|--------|----------|
+| [`install.sh`](scripts/install-linux.sh) | Production deployments |
+| [Docker](docker-compose.yml) | Try it locally |
+| [Source build](#build-from-source) | Development |
+
+### Build from source
+
+```bash
+git clone https://github.com/antonygiomarxdev/maverick
+cd maverick
+cargo build --release -p maverick-runtime-edge
+./target/release/maverick-edge --version
+```
+
+### Docker (local testing)
+
+```bash
+docker compose up
+```
+
+## Community
+
+- **Issues**: [GitHub Issues](https://github.com/antonygiomarxdev/maverick/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/antonygiomarxdev/maverick/discussions)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+
+Contributions welcome: core, extensions, hardware compatibility, docs.
+
+## Related
+
+| Project | How it relates |
+|---------|----------------|
+| [ChirpStack](https://www.chirpstack.io/) | LNS, requires PostgreSQL + MQTT + internet |
+| [The Things Stack](https://www.thethingsnetwork.org/docs/lns/) | LNS, cloud-first |
+| [Helium](https://www.helium.com/) | Decentralized wireless, depends on hotspot network |
+| **Maverick** | Offline-first, local, self-contained |
+
+---
 
 ## License
 
-MIT - see [`LICENSE`](LICENSE).
+MIT — see [LICENSE](LICENSE)
