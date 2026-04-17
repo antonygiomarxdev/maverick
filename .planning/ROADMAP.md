@@ -109,6 +109,29 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
+### Phase 6: Phase 4 Verification & Artifacts
+**Goal**: Create formal verification artifacts for Phase 4 and resolve remaining integration issues
+**Depends on**: Phase 4
+**Requirements**: RELI-03, RELI-04, SEC-02
+**Gap Closure**: Closes gaps from v1.0 audit:
+- Missing VERIFICATION.md for Phase 4
+- Missing SUMMARY.md for Phase 4
+- Watchdog integration test environment isolation (NOTIFY_SOCKET pollution)
+- SEC-02 deferred implementation (v1.1 candidate — schema documentation exists)
+**Plans**: TBD
+
+### Phase 7: Phase 5 Verification & Artifacts
+**Goal**: Create formal verification artifacts for Phase 5 and complete device management requirements
+**Depends on**: Phase 5
+**Requirements**: DEV-01, DEV-03, CORE-03
+**Gap Closure**: Closes gaps from v1.0 audit:
+- Missing VERIFICATION.md for Phase 5
+- Missing SUMMARY.md for Phase 5
+- DEV-01: Formal verification of device wizard via TUI
+- DEV-03: Explicit `device remove` CLI command (currently only via TOML edit + reload)
+- CORE-03: Formal verification of hardware probe on startup
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -122,3 +145,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3.1. Class A Downlink | 0/TBD | Not started | - |
 | 4. Process Supervision | 0/TBD | Not started | - |
 | 5. TUI Device Management | 0/TBD | Not started | - |
+| 6. Phase 4 Verification & Artifacts | 0/TBD | Not started | - |
+| 7. Phase 5 Verification & Artifacts | 0/TBD | Not started | - |
