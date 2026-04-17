@@ -510,8 +510,11 @@ name = "maverick-adapter-radio-spi"
 version = "0.1.4"
 dependencies = [
  "async-trait",
+ "cc",
  "maverick-core",
+ "maverick-domain",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -588,6 +591,7 @@ dependencies = [
  "maverick-core",
  "maverick-domain",
  "maverick-extension-contracts",
+ "maverick-runtime-edge",
  "rusqlite",
  "serde_json",
  "tempfile",
