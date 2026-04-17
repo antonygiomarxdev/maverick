@@ -145,6 +145,12 @@ jobs:
 
       - name: Build release binary
         run: |
+          set -euo pipefail
+
+          # Generate config.h for libloragw from library.cfg and VERSION
+          # This is required before building the SPI adapter
+          make -C libloragw/libloragw inc/config.h
+
           # ARM targets (aarch64, armv7) build with SPI support enabled
           # x86_64 builds without SPI since cross-compilation for C code isn't needed
           case "${{ matrix.target }}" in
