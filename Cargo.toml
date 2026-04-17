@@ -14,21 +14,21 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.4"
+version = "1.0.0"
 edition = "2021"
 authors = ["Antony Giomar <antonygiomarxdev@users.noreply.github.com>"]
 license = "MIT"
 repository = "https://github.com/antonygiomarxdev/maverick"
 
 [workspace.dependencies]
-maverick-domain = { path = "crates/maverick-domain", version = "0.1.0" }
-maverick-core = { path = "crates/maverick-core", version = "0.1.0" }
-maverick-extension-contracts = { path = "crates/maverick-extension-contracts", version = "0.1.0" }
-maverick-adapter-radio-udp = { path = "crates/maverick-adapter-radio-udp", version = "0.1.0" }
-maverick-adapter-radio-spi = { path = "crates/maverick-adapter-radio-spi", version = "0.1.0", default-features = false }
-maverick-adapter-persistence-sqlite = { path = "crates/maverick-adapter-persistence-sqlite", version = "0.1.0" }
-maverick-runtime-edge = { path = "crates/maverick-runtime-edge", version = "0.1.0" }
-maverick-cloud-core = { path = "crates/maverick-cloud-core", version = "0.1.0" }
+maverick-domain = { path = "crates/maverick-domain", version = "1.0.0" }
+maverick-core = { path = "crates/maverick-core", version = "1.0.0" }
+maverick-extension-contracts = { path = "crates/maverick-extension-contracts", version = "1.0.0" }
+maverick-adapter-radio-udp = { path = "crates/maverick-adapter-radio-udp", version = "1.0.0" }
+maverick-adapter-radio-spi = { path = "crates/maverick-adapter-radio-spi", version = "1.0.0", default-features = false }
+maverick-adapter-persistence-sqlite = { path = "crates/maverick-adapter-persistence-sqlite", version = "1.0.0" }
+maverick-runtime-edge = { path = "crates/maverick-runtime-edge", version = "1.0.0" }
+maverick-cloud-core = { path = "crates/maverick-cloud-core", version = "1.0.0" }
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
