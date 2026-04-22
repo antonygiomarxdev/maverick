@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: "Phase 13 complete: SPI cross-compilation CI support"
-last_updated: "2026-04-17T20:35:32.018Z"
+status: v1.0 milestone complete
+stopped_at: Phase 13 closed — SUMMARY.md written, STATE.md updated
+last_updated: "2026-04-22T18:20:05.848Z"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -23,28 +23,34 @@ progress:
 
 **Core value:** Your LoRaWAN data never dies — from radio to SQLite, preserved regardless of connectivity or failures.
 
-**Current focus:** Phase 11 — auto-update-mechanism-for-arm-gateways
+**Current focus:** v1.0 MVP shipped — all phases complete
 
 ## Current Position
 
-Phase: 11 (auto-update-mechanism-for-arm-gateways) — EXECUTING
-Plan: 1 of 3
-Next: Phase 8 — Hardware Testing (RAK Pi)
+Phase: 13 (ci-spi-support-with-libloragw-cross-compilation) — ✅ COMPLETE
+Plan: 1 of 1
+Next: v1.1 planning or execute pending verification (Phase 09-D)
 
-**v1 milestone progress:** [██░░░░░░░░] 28% (2/7 phases)
+**v1.0 milestone progress:** [████████████] 100% (13/13 phases)
 
 ## v1 Phases
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 01 | Protocol Correctness | ✅ Complete (partial - MIC/FCnt deferred) |
+| 01 | Protocol Correctness | ✅ Complete |
 | 02 | Radio Abstraction & SPI | ✅ Complete |
-| 03 | Protocol Security | 🔲 Next |
-| 04 | Class A Downlink | 🔲 Queued |
-| 05 | Extension IPC | 🔲 Queued |
-| 06 | Process Supervision | ✅ Complete |
+| 03 | Protocol Security | ✅ Complete |
+| 03.1 | Class A Downlink | ✅ Complete |
+| 04 | Process Supervision | ✅ Complete |
+| 05 | TUI Device Management | ✅ Complete |
+| 06 | Phase 4 Verification | ✅ Complete |
 | 07 | Phase 5 Verification | ✅ Complete |
-| 08 | Hardware Testing (RAK Pi) | ✅ Complete (hardware issue identified) |
+| 08 | Hardware Testing (RAK Pi) | ✅ Complete |
+| 09 | Hardware Auto-Detection & SPI Enable | ✅ Complete (09-D pending execution) |
+| 10 | libloragw SPI Integration | ✅ Complete |
+| 11 | Auto-Update Mechanism for ARM Gateways | ✅ Complete |
+| 12 | Release CI Hardening and Update URL Configuration | ✅ Complete |
+| 13 | CI SPI Support with libloragw Cross-Compilation | ✅ Complete |
 
 ## Decisions
 
@@ -52,12 +58,14 @@ Next: Phase 8 — Hardware Testing (RAK Pi)
 - [Phase 01]: NwkSKey stored in SessionSnapshot — gates MIC implementation
 - [Phase 02]: UplinkSource port trait enables SPI adapter
 - [Phase 03]: Downlink depends on correct protocol — MIC + FCnt must be done first
+- [Phase 13]: Vendoring HAL sources avoids external CI dependencies and guarantees reproducible builds
+- [Phase 13]: Sysroot detection via `CFLAGS_*` is primary; fallback env vars support custom toolchains
 
 ## Session Continuity
 
-Last session: 2026-04-17T20:35:32.013Z
-Stopped at: Phase 13 complete: SPI cross-compilation CI support
-Next: `/gsd-discuss-phase 3` or `/gsd-plan-phase 3`
+Last session: 2026-04-22
+Stopped at: Phase 13 closed — SUMMARY.md written, STATE.md updated
+Next: v1.1 planning, or execute Phase 09-D verification when hardware available
 
 ## Roadmap Evolution
 

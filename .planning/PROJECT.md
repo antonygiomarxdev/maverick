@@ -60,6 +60,9 @@ The architecture is a rock-solid core surrounded by fully isolated, optional ext
 - ✓ Device list with last-seen and uplink count (Phase 5)
 - ✓ lns-config.toml import for bulk provisioning (Phase 5)
 - ✓ Autoprovision-pending device promotion via TUI (Phase 5)
+- ✓ Auto-update mechanism for ARM gateways — systemd timer, atomic replacement, backup rotation (Phase 11)
+- ✓ Release CI hardening — update URL configuration, multi-arch builds (Phase 12)
+- ✓ SPI-enabled ARM binaries in CI — libloragw cross-compilation with sysroot detection (Phase 13)
 
 ### Active
 
@@ -68,6 +71,7 @@ The architecture is a rock-solid core surrounded by fully isolated, optional ext
 - [ ] DEV-03: Direct `device remove` CLI command
 - [ ] DWNL-01..DWNL-06: Full downlink integration (SPI TX, runtime wiring)
 - [ ] RADIO-01: Full SPI RX/TX on real ARM hardware
+- [ ] 09-D: Auto-detection verification integration tests (pending hardware/mocks)
 
 ### Out of Scope (v1)
 
@@ -126,22 +130,25 @@ The architecture is a rock-solid core surrounded by fully isolated, optional ext
 
 **v1.0 shipped** — 2026-04-17
 
-**Current codebase state (as of 2026-04-17):**
-- Direct SPI radio adapter (`maverick-adapter-radio-spi`) with libloragw FFI bindings
+**Current codebase state (as of 2026-04-22):**
+- Direct SPI radio adapter (`maverick-adapter-radio-spi`) with libloragw FFI bindings and vendored sx1302_hal C sources
 - UDP/GWMP ingest path fully functional: GWMP parse → session lookup → MIC verify → protocol validate → SQLite persist
 - MIC verification fully implemented with LoRaWAN spec test vectors
 - FCnt 32-bit support implemented — sessions survive beyond 65535 uplinks
 - NwkSKey and AppSKey stored per session, used for MIC computation and payload decryption
 - `DeviceRepository` and `DownlinkRepository` port traits with SQLite adapters
-- Class A downlink scheduler designed (RX1/RX2 timing) but not yet wired to runtime
+- Class A downlink scheduler designed (RX1/RX2 timing) with SQLite-backed queue persistence
 - TUI device management complete with wizard-based add/edit/remove
-- Systemd supervision with watchdog support
-- Hardware probe runs on startup and surfaces in TUI
+- Systemd supervision with watchdog support and auto-update timer
+- Hardware probe runs on startup and surfaces in TUI; SPI auto-detection on ARM
+- Release CI produces SPI-enabled ARM binaries (aarch64, armv7) with cross-compilation sysroot detection
+- Atomic self-update mechanism with backup rotation for ARM gateways
 
 **v1.0 Stats:**
-- 217 files changed, 28,488 insertions, 778 deletions
-- 11 phases, 33 plans completed
-- 28,533 lines of Rust/TOML code
+- 331 files changed, 39,119 insertions(+), 1,310 deletions(-)
+- 13 phases, 35+ plans completed
+- ~57,823 lines of Rust/TOML code
+- 175 commits over 9 days (2026-04-08 → 2026-04-17)
 
 ## Constraints
 
@@ -169,6 +176,8 @@ The architecture is a rock-solid core surrounded by fully isolated, optional ext
 | Decimal phase numbering | Clear semantics for inserted phases | ✅ Good |
 | Class A downlink deferred | SPI TX not ready; design exists but needs wiring | ⚠️ Revisit in v1.1 |
 | SEC-02 deferred to v1.1 | Domain model refactor required before SQLCipher | 🔲 Pending |
+| Vendoring HAL sources | Avoids external CI dependencies; guarantees reproducible builds | ✅ Good |
+| Sysroot via CFLAGS_* | Primary cross-compilation detection; fallback env vars for custom toolchains | ✅ Good |
 
 ---
 
@@ -190,4 +199,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 after v1.0 milestone*
+*Last updated: 2026-04-22 after v1.0 milestone completion*
