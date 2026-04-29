@@ -147,8 +147,8 @@ pub fn lgw_hal_start(spi_path: &str) -> AppResult<()> {
             enable: true,
             rf_chain,
             freq_hz,
-            bandwidth: 0, // default
-            datarate: 7,  // DR_LORA_SF7
+            bandwidth: 0,      // default
+            datarate: 7,       // DR_LORA_SF7
             sync_word_size: 0, // default
             sync_word: 0,
             implicit_hdr: false,
