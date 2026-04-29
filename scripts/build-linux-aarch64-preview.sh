@@ -30,5 +30,6 @@ cargo build --locked --release -p maverick-extension-tui --target aarch64-unknow
 mkdir -p /workspace/dist/pi-preview
 cp -a /workspace/target/aarch64-unknown-linux-gnu/release/maverick-edge /workspace/dist/pi-preview/
 cp -a /workspace/target/aarch64-unknown-linux-gnu/release/maverick-edge-tui /workspace/dist/pi-preview/
-chmod +x /workspace/dist/pi-preview/maverick-edge /workspace/dist/pi-preview/maverick-edge-tui
+cp -a /workspace/scripts/maverick-reset-spi.sh /workspace/dist/pi-preview/
+chmod +x /workspace/dist/pi-preview/maverick-edge /workspace/dist/pi-preview/maverick-edge-tui /workspace/dist/pi-preview/maverick-reset-spi.sh
 echo "OK: /workspace/dist/pi-preview ready."

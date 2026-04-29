@@ -5,6 +5,7 @@ Wants=network.target
 
 [Service]
 Type=notify
+ExecStartPre=/usr/local/bin/maverick-reset-spi.sh start
 ExecStart=/usr/local/bin/maverick-edge radio ingest-loop
 Environment="MAVERICK_DATA_DIR=/var/lib/maverick"
 Restart=always
@@ -12,13 +13,14 @@ RestartSec=2s
 WatchdogSec=30s
 User=maverick
 Group=maverick
+SupplementaryGroups=gpio spi
 Environment=RUST_LOG=info
 EnvironmentFile=-/etc/maverick/edge.env
 
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/maverick /etc/maverick
+ReadWritePaths=/var/lib/maverick /etc/maverick /sys/class/gpio
 PrivateTmp=true
 
 [Install]

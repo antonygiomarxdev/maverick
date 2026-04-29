@@ -165,10 +165,11 @@ jobs:
           cp target/${{ matrix.target }}/release/maverick-edge dist/maverick-edge
           cp target/${{ matrix.target }}/release/maverick-edge-tui dist/maverick-edge-tui
           cp scripts/install-linux.sh dist/install-linux.sh
-          chmod +x dist/maverick-edge dist/maverick-edge-tui dist/install-linux.sh
+          cp scripts/maverick-reset-spi.sh dist/maverick-reset-spi.sh
+          chmod +x dist/maverick-edge dist/maverick-edge-tui dist/install-linux.sh dist/maverick-reset-spi.sh
           echo "${{ needs.prepare.outputs.version_tag }}" > dist/version.txt
           cd dist
-          tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh version.txt
+          tar -czf ../${{ matrix.artifact }}.tar.gz maverick-edge maverick-edge-tui install-linux.sh maverick-reset-spi.sh version.txt
           cd ..
           sha256sum ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
 
@@ -178,7 +179,7 @@ jobs:
           set -euo pipefail
           archive="${{ matrix.artifact }}.tar.gz"
           tar -tzf "${archive}" | sort > archive.txt
-          diff -u <(printf '%s\n' install-linux.sh maverick-edge maverick-edge-tui version.txt | sort) archive.txt
+          diff -u <(printf '%s\n' install-linux.sh maverick-edge maverick-edge-tui maverick-reset-spi.sh version.txt | sort) archive.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

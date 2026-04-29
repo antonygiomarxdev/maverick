@@ -584,6 +584,7 @@ install_maverick_systemd_service() {
     printf 'Environment="MAVERICK_GWMP_BIND=%s"\n' "${gwmp}"
     printf 'Environment="MAVERICK_GWMP_LOOP_READ_TIMEOUT_MS=%s"\n' "${rt_ms}"
     printf 'Environment="MAVERICK_GWMP_LOOP_MAX_MESSAGES=%s"\n' "${max_msg}"
+    echo "ExecStartPre=${INSTALL_DIR}/maverick-reset-spi.sh start"
     echo "ExecStart=${INSTALL_DIR}/maverick-edge radio ingest-loop"
     echo "Restart=on-failure"
     echo "RestartSec=5"
@@ -965,6 +966,11 @@ install_one() {
 
 install_one "${TMP_DIR}/maverick-edge" "maverick-edge"
 validate_binary "${INSTALL_DIR}/maverick-edge" "maverick-edge"
+
+if [[ -f "${TMP_DIR}/maverick-reset-spi.sh" ]]; then
+  install_one "${TMP_DIR}/maverick-reset-spi.sh" "maverick-reset-spi.sh"
+  echo "Installed: ${INSTALL_DIR}/maverick-reset-spi.sh"
+fi
 
 if [[ -f "${TMP_DIR}/maverick-edge-tui" ]]; then
   chmod +x "${TMP_DIR}/maverick-edge-tui"
