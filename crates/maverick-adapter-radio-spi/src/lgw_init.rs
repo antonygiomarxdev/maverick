@@ -27,7 +27,7 @@ pub fn lgw_hal_start(spi_path: &str) -> AppResult<()> {
         com_path: [0; 64],
     };
     for (i, c) in spi_path.bytes().take(63).enumerate() {
-        board_conf.com_path[i] = c;
+        board_conf.com_path[i] = c as i8;
     }
     let board_ptr = &mut board_conf as *mut _;
     let ret = unsafe { lgw_bindings::lgw_board_setconf(board_ptr) };
@@ -49,7 +49,7 @@ pub fn lgw_hal_start(spi_path: &str) -> AppResult<()> {
             coeff_d: 0.0,
             coeff_e: 0.0,
         },
-        type_: 0, // lgw_radio_type_t_LGW_RADIO_TYPE_NONE
+        type_: lgw_bindings::lgw_radio_type_t_LGW_RADIO_TYPE_SX1250,
         tx_enable: false,
         single_input_mode: false,
     };
@@ -73,7 +73,7 @@ pub fn lgw_hal_start(spi_path: &str) -> AppResult<()> {
             coeff_d: 0.0,
             coeff_e: 0.0,
         },
-        type_: 0, // lgw_radio_type_t_LGW_RADIO_TYPE_NONE
+        type_: lgw_bindings::lgw_radio_type_t_LGW_RADIO_TYPE_SX1250,
         tx_enable: false,
         single_input_mode: false,
     };
