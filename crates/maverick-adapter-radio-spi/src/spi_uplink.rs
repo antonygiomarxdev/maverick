@@ -34,6 +34,12 @@ struct SpiInner {
     idle_timeout: Duration,
 }
 
+impl Drop for SpiInner {
+    fn drop(&mut self) {
+        lgw_hal_stop();
+    }
+}
+
 impl SpiUplinkSource {
     pub fn new(spi_path: String, idle_timeout: Duration) -> AppResult<Self> {
         let trimmed = spi_path.trim();
@@ -97,12 +103,6 @@ impl UplinkSource for SpiUplinkSource {
         tokio::task::spawn_blocking(move || this.blocking_receive())
             .await
             .map_err(|e| AppError::Infrastructure(format!("spi uplink join: {}", e)))?
-    }
-}
-
-impl Drop for SpiUplinkSource {
-    fn drop(&mut self) {
-        lgw_hal_stop();
     }
 }
 
