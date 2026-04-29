@@ -130,6 +130,68 @@ pub fn lgw_hal_start(spi_path: &str) -> AppResult<()> {
         )));
     }
 
+    // Configure 8 multi-SF LoRa channels (AU915-like plan)
+    // RF0=915.9 MHz center, RF1=917.5 MHz center
+    let if_freqs: [(i32, u8); 8] = [
+        (-400_000, 1), // 917.1 MHz on RF1
+        (-200_000, 1), // 917.3 MHz on RF1
+        (0, 1),        // 917.5 MHz on RF1
+        (-400_000, 0), // 915.5 MHz on RF0
+        (-200_000, 0), // 915.7 MHz on RF0
+        (0, 0),        // 915.9 MHz on RF0
+        (200_000, 0),  // 916.1 MHz on RF0
+        (400_000, 0),  // 916.3 MHz on RF0
+    ];
+    for (i, &(freq_hz, rf_chain)) in if_freqs.iter().enumerate() {
+        let mut if_conf = lgw_bindings::lgw_conf_rxif_s {
+            enable: true,
+            rf_chain,
+            freq_hz,
+            bandwidth: 0, // default
+            datarate: lgw_bindings::dr_e_DR_LORA_SF7,
+            sync_word_size: 0, // default
+        };
+        let if_ptr = &mut if_conf as *mut _;
+        let ret = unsafe { lgw_bindings::lgw_rxif_setconf(i as u8, if_ptr) };
+        if ret != 0 {
+            return Err(AppError::Infrastructure(format!(
+                "lgw_rxif_setconf channel {} failed: {}",
+                i, ret
+            )));
+        }
+    }
+
+    // Configure LoRa service channel (channel 8)
+    let mut service_conf = lgw_bindings::lgw_conf_rxif_s {
+        enable: true,
+        rf_chain: 1,
+        freq_hz: -200_000, // 917.3 MHz on RF1
+        bandwidth: lgw_bindings::bw_e_BW_250KHZ,
+        datarate: lgw_bindings::dr_e_DR_LORA_SF7,
+        sync_word_size: 0,
+    };
+    let service_ptr = &mut service_conf as *mut _;
+    let ret = unsafe { lgw_bindings::lgw_rxif_setconf(8, service_ptr) };
+    if ret != 0 {
+        return Err(AppError::Infrastructure(format!(
+            "lgw_rxif_setconf service channel failed: {}",
+            ret
+        )));
+    }
+
+    // Configure demodulator
+    let mut demod_conf = lgw_bindings::lgw_conf_demod_s {
+        multisf_datarate: 0xFF, // enable all SFs
+    };
+    let demod_ptr = &mut demod_conf as *mut _;
+    let ret = unsafe { lgw_bindings::lgw_demod_setconf(demod_ptr) };
+    if ret != 0 {
+        return Err(AppError::Infrastructure(format!(
+            "lgw_demod_setconf failed: {}",
+            ret
+        )));
+    }
+
     let ret = unsafe { lgw_bindings::lgw_start() };
     if ret != 0 {
         return Err(AppError::Infrastructure(format!(
