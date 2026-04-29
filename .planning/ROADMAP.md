@@ -29,7 +29,10 @@
 
 ### 🚧 v1.1 (Next Release)
 
-_No phases planned yet. Run `/gsd-new-milestone` to define v1.1 scope._
+- [ ] Phase 14: Fix Cross-Compiled SPI Binary Initialization (0/1 plans) — in progress
+- [ ] Phase 15: Auto-Update Binary Verification (0/1 plans) — planned
+- [ ] Phase 16: Structured File Logging & Observability (0/1 plans) — planned
+- [ ] Phase 17: TBD (remaining v1.1 features)
 
 ## Progress
 
@@ -49,6 +52,7 @@ _No phases planned yet. Run `/gsd-new-milestone` to define v1.1 scope._
 | 11. Auto-Update Mechanism | v1.0 | 3/3 | Complete | 2026-04-17 |
 | 12. Release CI Hardening | v1.0 | 1/1 | Complete | 2026-04-17 |
 | 13. CI SPI Cross-Compilation | v1.0 | 1/1 | Complete | 2026-04-17 |
+| 14. Fix Cross-Compiled SPI Binary | v1.1 | 0/1 | In Progress | — |
 
 ## Known Tech Debt (v1.0)
 
